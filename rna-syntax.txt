@@ -1,0 +1,31 @@
+Each RNA command is encoded in a single line.  The first character of
+the line is the symbol (see below).  The rest of the line is history
+information, which is yet to be defined.
+
+
+Symbol	Meaning
+
+K	black
+R	red
+G	green
+Y	yellow
+B	blue
+M	magenta
+C	cyan
+W	white
+T	transparent
+O	opaque
+
+e	clear bucket
+
+^	move
+<	counter clockwise
+>	clockwise
+=	mark
+-	line
+!	fill
++	add bitmap
+*	compose
+&	clip
+
+?XXXXXXX	dead rna
