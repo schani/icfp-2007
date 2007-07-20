@@ -75,7 +75,7 @@ let rec nth hbuf i =
    assert (i < (length hbuf));
    match hbuf with
        ArrayBuf (arr, len) -> char_to_base (Buffer.nth arr i)
-     | SubBuf (hbuf, start, _) -> nth hbuf (i - start)
+     | SubBuf (hbuf, start, _) -> nth hbuf (start + i)
      | ConcatBuf (buf1, buf2, _) ->
 	 let len1 = length buf1
 	 in if i < len1 then

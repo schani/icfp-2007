@@ -2,11 +2,13 @@
 
 open Dnabuf
 
+exception Hell;;
+
 (****************************************************************************)
 
 let finish rna =
-(*  let _ = print_string rna in *)
-  exit 0
+  write_dna rna stdout;
+  exit 0;;
 
 type pattern_item = 
   | P_Base of base
@@ -53,6 +55,7 @@ let rec get_consts dna =
 
 (****************************************************************************)
 
+(* val get_pattern: dna -> dna -> int -> pattern_item list -> (dna * dna * pattern_item list) *)
 let rec get_pattern dna rna lvl p_rev =
   match consume dna with
     | None -> finish rna
@@ -76,8 +79,10 @@ let rec get_pattern dna rna lvl p_rev =
 		  | Some(P,dna) ->
 		      get_pattern dna rna (lvl+1) (P_ParenL::p_rev)
 		  | Some(C,dna) | Some(F,dna) ->
-		      if lvl = 0 then List.rev p_rev
-		      else get_pattern dna rna (lvl-1) (P_ParenR::p_rev)
+		      if lvl = 0 then
+			(dna, rna, List.rev p_rev)
+		      else
+			get_pattern dna rna (lvl-1) (P_ParenR::p_rev)
 		  | Some(I,dna) -> 
 		      let first7 = subbuf dna 0 7 in 
 			get_pattern (skip dna 7) (concat rna first7) lvl p_rev
@@ -86,6 +91,7 @@ let rec get_pattern dna rna lvl p_rev =
 
 (****************************************************************************)
 
+(* val get_template: dna -> dna -> template_item list -> (dna * dna * template_item list) *)
 let rec get_template dna (rna:dna) t_rev =
   match consume dna with
     | Some(C,dna) -> 
@@ -123,37 +129,110 @@ let rec get_template dna (rna:dna) t_rev =
 
 (****************************************************************************)
 
-let ic_dna = concat_base (dna_from_base I) C;;
+let rec quote d prefix =
+  match consume d with
+      None -> prefix
+    | Some (I, d) -> quote d (concat_base prefix C)
+    | Some (C, d) -> quote d (concat_base prefix F)
+    | Some (F, d) -> quote d (concat_base prefix P)
+    | Some (P, d) -> quote d (concat_base (concat_base prefix I) C);;
 
-let rec quote d =
-  let rec convert d prefix =
-    match consume d with
-	None -> empty_dna
-      | Some (I, d) -> convert d (concat_base prefix C)
-      | Some (C, d) -> convert d (concat_base prefix F)
-      | Some (F, d) -> convert d (concat_base prefix P)
-      | Some (P, d) -> convert d (concat prefix ic_dna)
-  in
-    convert d empty_dna;;
-
-let rec protect l d =
+let rec protect l d prefix =
   if l = 0 then
-    d
+    (concat prefix d)
   else
-    protect (l - 1) (quote d);;
+    protect (l - 1) (quote d empty_dna) prefix;;
 
-let asnat n =
-  let rec convert n prefix =
-    if n = 0 then
-      concat_base prefix P
-    else if (n mod 2) = 1 then
-      convert (n / 2) (concat_base prefix I)
-    else
-      convert (n / 2) (concat_base prefix C)
-  in
-    convert n empty_dna;;
+let rec asnat n prefix =
+  if n = 0 then
+    concat_base prefix P
+  else if (n mod 2) = 0 then
+    asnat (n / 2) (concat_base prefix I)
+  else
+    asnat (n / 2) (concat_base prefix C);;
 
 (****************************************************************************)
+
+let replace tpl e =
+  let rec work tpl r =
+    match tpl with
+	[] -> r
+      | (T_Base base) :: tpl -> work tpl (concat_base r base)
+      | (T_Sub (n, l)) :: tpl -> work tpl (protect l (List.nth e n) r)
+      | (T_Abs n) :: tpl -> work tpl (asnat (length (List.nth e n)) r)
+  in
+    work tpl empty_dna;;
+
+(****************************************************************************)
+
+let rec search pat dna =
+  let pat_len = length pat
+  in let rec matches pat dna =
+      match ((consume pat), (consume dna)) with
+	  (None, _) -> true
+	| (Some (base1, pat), Some (base2, dna)) ->
+	    if base1 = base2 then
+	      matches pat dna
+	    else
+	      false
+	| _ -> raise Hell
+     and work dna i =
+      if (length dna) < pat_len then
+	None
+      else if matches pat dna then
+	Some i
+      else 
+	work (skip dna 1) (i + 1)
+  in
+    work dna 0;;
+
+(* val build_env : pattern_item list -> dna -> ((dna list), int, dna) option *)
+let build_env pat dna_orig =
+  let rec build pat dna i c env =
+    match pat with
+	[] ->
+	  (assert (c = []);
+	   Some ((List.rev env), i, dna))
+      | P_Base base :: pat ->
+	  (match consume dna with
+	       None -> None
+	     | Some (b, dna) ->
+		 if base = b then
+		   build pat dna (i + 1) c env
+		 else
+		   None)
+      | P_Skip n :: pat ->
+	  if n > (length dna) then
+	    None
+	  else
+	    build pat (skip dna n) (i + n) c env
+      | P_Search s :: pat ->
+	  (match search s dna with
+	       Some n ->
+		 let n = n + (length s)
+		 in build pat (skip dna n) (i + n) c env
+	     | None -> None)
+      | P_ParenL :: pat ->
+	  build pat dna i (i :: c) env
+      | P_ParenR :: pat ->
+	  build pat dna i (List.tl c) ((subbuf dna_orig (List.hd c) i) :: env)
+  in
+    build pat dna_orig 0 [] [];;
+
+let matchreplace pat tpl dna =
+  match build_env pat dna with
+      Some (env, i, dna) ->
+	concat (replace tpl env) dna
+    | None ->
+	dna;;
+
+(****************************************************************************)
+
+let rec execute dna rna =
+  let (dna, rna, pat) = get_pattern dna rna 0 []
+  in let (dna, rna, tpl) = get_template dna rna []
+  in
+    execute (matchreplace pat tpl dna) rna;;
 
 (*
 let rec execute_loop dna rna = 
