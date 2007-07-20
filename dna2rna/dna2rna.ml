@@ -65,16 +65,19 @@ let rec get_nat (dna:dna) (rna:dna) =
     | Some(F,dna) -> let (n,dna) = get_nat dna rna in (n*2,dna)
     | Some(C,dna) -> let (n,dna) = get_nat dna rna in (n*2+1,dna)
 
-let rec get_consts dna_orig = 
-  match consume dna_orig with
-    | None -> (empty_dna, dna_orig)
-    | Some(C,dna) -> let (s,dna) = get_consts dna in (concat_base s I,dna)
-    | Some(F,dna) -> let (s,dna) = get_consts dna in (concat_base s C,dna)
-    | Some(P,dna) -> let (s,dna) = get_consts dna in (concat_base s F,dna)
-    | Some(I,dna) ->
-	(match consume dna with
-	   | Some(C,dna) -> let (s,dna) = get_consts dna in (concat_base s P,dna)
-	   | _ -> (empty_dna, dna_orig))
+let get_consts dna_orig =
+  let rec work dna_orig s =
+    match consume dna_orig with
+      | None -> (s, dna_orig)
+      | Some(C,dna) -> work dna (concat_base s I)
+      | Some(F,dna) -> work dna (concat_base s C)
+      | Some(P,dna) -> work dna (concat_base s F)
+      | Some(I,dna) ->
+	  (match consume dna with
+	     | Some(C,dna) -> work dna (concat_base s P)
+	     | _ -> (s, dna_orig))
+  in
+    work dna_orig empty_dna;;
 
 (****************************************************************************)
 
@@ -131,7 +134,7 @@ let rec get_template dna (rna:dna) t_rev =
 	   | Some(F,dna) | Some(P,dna) -> 
 	       let (l,dna) = get_nat dna rna in
 	       let (n,dna) = get_nat dna rna in
-	         get_template dna rna ((T_Sub(l,n))::t_rev)
+	         get_template dna rna ((T_Sub(n,l))::t_rev)
 	   | Some(I,dna) ->
 	       (match consume dna with
 		  | Some(C,dna)
@@ -242,10 +245,21 @@ let build_env pat dna_orig =
   in
     build pat dna_orig 0 [] [];;
 
+let print_env env =
+  let rec print env i =
+    match env with
+	[] -> ()
+      | d :: env ->
+	  print_int i; print_string ": "; write_dna d stdout; print_newline ();
+	  print env (i + 1)
+  in
+    print env 0;;
+
 let matchreplace pat tpl dna =
   match build_env pat dna with
       Some (env, i, dna) ->
-	(print_string "got match!\n";
+	(print_string "got match:\n";
+	 (* print_env env; *)
 	 concat (replace tpl env) dna)
     | None ->
 	(print_string "no match\n";
@@ -256,14 +270,17 @@ let matchreplace pat tpl dna =
 let rec execute dna rna i =
   let (dna, rna, pat) = get_pattern dna rna 0 []
   in print_string "pattern: "; print_pattern pat; print_newline ();
-    print_string "rna: "; write_dna rna stdout; print_newline ();
+    (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
     let (dna, rna, tpl) = get_template dna rna []
     in print_string "template: "; print_template tpl; print_newline ();
-      print_string "rna: "; write_dna rna stdout; print_newline ();
-      let filename = sprintf "endo.%d.dna" i
-      in let file = open_out filename
-      in write_dna dna file; close_out file;
-	execute (matchreplace pat tpl dna) rna (i + 1);;
+      (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
+      if (i mod 10000) = 9999 then
+	(let filename = sprintf "endo.%d.rna" (i / 10000)
+	 in let file = open_out filename
+	 in write_dna rna file; close_out file);
+      let dna = matchreplace pat tpl dna
+      in 
+	execute dna rna (i + 1);;
 
 (*
 let rec execute_loop dna rna = 
