@@ -1,0 +1,32 @@
+#!/usr/bin/perl -w
+
+%instr =
+  (
+   "PIPIIIC" => 'K',
+   "PIPIIIP" => 'R',
+   "PIPIICC" => 'G',
+   "PIPIICF" => 'Y',
+   "PIPIICP" => 'B',
+   "PIPIIFC" => 'M',
+   "PIPIIFF" => 'C',
+   "PIPIIPC" => 'W',
+   "PIPIIPF" => 'T',
+   "PIPIIPP" => 'O',
+
+   "PIPIICP" => 'e',
+
+   "PIIIIIP" => '^',
+   "PCCCCCP" => '<',
+   "PFFFFFF" => '>',
+   "PCCIFFP" => '=',
+   "PFFICCP" => '-',
+   "PIIPIIP" => '!',
+   "PCCPFFP" => '+',
+   "PFFPCCP" => '*',
+   "PFFICCF" => '&'
+  );
+	
+$/ = \7;
+$\ = "\n";
+
+map{if(exists  $instr{$_}){print $instr{$_}}else{print "?$_"}}<>;
