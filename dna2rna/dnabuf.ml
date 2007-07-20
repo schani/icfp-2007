@@ -102,3 +102,24 @@ let consume hbuf =
     Some (nth hbuf 0, skip hbuf 1)
   else
     None;;
+
+(* val read_dna : in_channel -> dna *)
+let read_dna file =
+  create (input_line file);;
+
+(* val write_dna : dna -> out_channel -> unit *)
+let write_dna buf file =
+  let rec write buf start stop =
+    match buf with
+	ArrayBuf (buf, len) ->
+	  output_string file (Buffer.sub buf start (stop - start))
+      | SubBuf (sub, sub_start, _) ->
+	  write sub (sub_start + start) (sub_start + stop)
+      | ConcatBuf (buf1, buf2, len) ->
+	  let len1 = length buf1
+	  in (if start < len1 then
+		write buf1 start (min len1 stop);
+	      if stop > len1 then
+		write buf2 (max 0 (start - len1)) (stop - len1))
+  in
+    write buf 0 (length buf);;
