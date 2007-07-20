@@ -19,6 +19,19 @@ type pattern_item =
 
 type pattern = pattern_item list
 
+let rec print_pattern = function
+    [] -> ()
+  | P_Base base :: pat ->
+      print_char (base_to_char base); print_pattern pat
+  | P_Skip n :: pat ->
+      print_string "[!"; print_int n; print_string "]"; print_pattern pat
+  | P_Search dna :: pat ->
+      print_string "[?"; write_dna dna stdout; print_string "]"; print_pattern pat
+  | P_ParenL :: pat ->
+      print_string "("; print_pattern pat
+  | P_ParenR :: pat ->
+      print_string ")"; print_pattern pat
+
 (* 
 	d_str = dna string
 	d_idx = current pos
@@ -29,8 +42,17 @@ type template_item =
   | T_Base of base
   | T_Sub of int * int
   | T_Abs of int
-  
-type templates = template_item list
+
+type template = template_item list
+
+let rec print_template = function
+    [] -> ()
+  | T_Base base :: tpl ->
+      print_char (base_to_char base); print_template tpl
+  | T_Sub (n, l) :: tpl ->
+      print_string "("; print_int n; print_string "_"; print_int l; print_string ")"; print_template tpl
+  | T_Abs n :: tpl ->
+      print_string "|"; print_int n; print_string "|"; print_template tpl
 
 (****************************************************************************)
 
@@ -42,20 +64,20 @@ let rec get_nat (dna:dna) (rna:dna) =
     | Some(F,dna) -> let (n,dna) = get_nat dna rna in (n*2,dna)
     | Some(C,dna) -> let (n,dna) = get_nat dna rna in (n*2+1,dna)
 
-let rec get_consts dna = 
-  match consume dna with
-    | None -> (create "",dna)
+let rec get_consts dna_orig = 
+  match consume dna_orig with
+    | None -> (empty_dna, dna_orig)
     | Some(C,dna) -> let (s,dna) = get_consts dna in (concat_base s I,dna)
     | Some(F,dna) -> let (s,dna) = get_consts dna in (concat_base s C,dna)
     | Some(P,dna) -> let (s,dna) = get_consts dna in (concat_base s F,dna)
     | Some(I,dna) ->
 	(match consume dna with
 	   | Some(C,dna) -> let (s,dna) = get_consts dna in (concat_base s P,dna)
-	   | _ -> (create "",dna))
+	   | _ -> (empty_dna, dna_orig))
 
 (****************************************************************************)
 
-(* val get_pattern: dna -> dna -> int -> pattern_item list -> (dna * dna * pattern_item list) *)
+(* val get_pattern: dna -> dna -> int -> pattern -> (dna * dna * pattern) *)
 let rec get_pattern dna rna lvl p_rev =
   match consume dna with
     | None -> finish rna
@@ -67,11 +89,11 @@ let rec get_pattern dna rna lvl p_rev =
 	   | None -> finish rna
 	   | Some(C,dna) -> get_pattern dna rna lvl (P_Base(P)::p_rev)
 	   | Some(P,dna) -> 
-	       let (n,d_idx) = get_nat dna rna
+	       let (n, dna) = get_nat dna rna
 		 in get_pattern dna rna lvl (P_Skip(n)::p_rev)
 	   | Some(F,dna) ->
 	       let dna = skip dna 1 in 		(* three bases consumed *)
-	       let (s,d_idx) = get_consts dna
+	       let (s, dna) = get_consts dna
 		 in get_pattern dna rna lvl (P_Search(s)::p_rev)
 	   | Some(I,dna) ->
 	       (match consume dna with
@@ -91,7 +113,7 @@ let rec get_pattern dna rna lvl p_rev =
 
 (****************************************************************************)
 
-(* val get_template: dna -> dna -> template_item list -> (dna * dna * template_item list) *)
+(* val get_template: dna -> dna -> template -> (dna * dna * template) *)
 let rec get_template dna (rna:dna) t_rev =
   match consume dna with
     | Some(C,dna) -> 
@@ -186,7 +208,7 @@ let rec search pat dna =
   in
     work dna 0;;
 
-(* val build_env : pattern_item list -> dna -> ((dna list), int, dna) option *)
+(* val build_env : pattern -> dna -> ((dna list), int, dna) option *)
 let build_env pat dna_orig =
   let rec build pat dna i c env =
     match pat with
@@ -230,9 +252,12 @@ let matchreplace pat tpl dna =
 
 let rec execute dna rna =
   let (dna, rna, pat) = get_pattern dna rna 0 []
-  in let (dna, rna, tpl) = get_template dna rna []
-  in
-    execute (matchreplace pat tpl dna) rna;;
+  in print_string "pattern: "; print_pattern pat; print_newline ();
+    print_string "rna: "; write_dna rna stdout; print_newline ();
+    let (dna, rna, tpl) = get_template dna rna []
+    in print_string "template: "; print_template tpl; print_newline ();
+      print_string "rna: "; write_dna rna stdout; print_newline ();
+      execute (matchreplace pat tpl dna) rna;;
 
 (*
 let rec execute_loop dna rna = 
