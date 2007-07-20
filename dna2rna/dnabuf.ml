@@ -1,37 +1,48 @@
-type 'a hbuf =
-    ArrayBuf of 'a array
-  | SubBuf of 'a hbuf * int * int
-  | ConcatBuf of 'a hbuf * 'a hbuf * int;;
+exception Invalid_base_char;;
 
-(* val create : 'a array -> 'a hbuf *)
+type base = I | C | F | P;;
+
+type dna =
+    ArrayBuf of string
+  | SubBuf of dna * int * int
+  | ConcatBuf of dna * dna * int;;
+
+(* val create : string -> dna *)
 let create arr =
   ArrayBuf arr;;
 
-(* val length : 'a hbuf -> int *)
+(* val length : dna -> int *)
 let rec length = function
-    ArrayBuf arr -> Array.length arr
+    ArrayBuf arr -> String.length arr
   | SubBuf (_, start, stop) -> stop - start
   | ConcatBuf (_, _, len) -> len;;
 
-(* val subbuf : 'a hbuf -> int -> int -> 'a hbuf *)
+(* val subbuf : dna -> int -> int -> dna *)
 let subbuf hbuf start stop =
   (assert (stop >= start);
    assert (start >= 0);
    assert (stop <= (length hbuf));
    SubBuf (hbuf, start, stop));;
 
-(* val concat : 'a hbuf -> 'a hbuf -> 'a hbuf *)
+(* val concat : dna -> dna -> dna *)
 let concat buf1 buf2 =
   let len1 = length buf1
   and len2 = length buf2
   in ConcatBuf (buf1, buf2, (len1 + len2));;
 
-(* val nth : 'a hbuf -> int -> 'a *)
+let char_to_base = function
+    'I' -> I
+  | 'C' -> C
+  | 'F' -> F
+  | 'P' -> P
+  | _ -> raise Invalid_base_char;;
+
+(* val nth : dna -> int -> base *)
 let rec nth hbuf i =
   (assert (i >= 0);
    assert (i < (length hbuf));
    match hbuf with
-       ArrayBuf arr -> arr.(i)
+       ArrayBuf arr -> char_to_base (String.get arr i)
      | SubBuf (hbuf, start, _) -> nth hbuf (i - start)
      | ConcatBuf (buf1, buf2, _) ->
 	 let len1 = length buf1
@@ -40,7 +51,7 @@ let rec nth hbuf i =
 	   else
 	     nth buf2 (i - len1));;
 
-(* val skip : 'a hbuf -> int -> 'a hbuf *)
+(* val skip : dna -> int -> dna *)
 let rec skip hbuf i =
   let len = length hbuf
   in if len <= i then
@@ -56,7 +67,7 @@ let rec skip hbuf i =
 	      else
 		ConcatBuf (skip buf1 i, buf2, len - i);;
 
-(* val consume : 'a hbuf -> ('a * ('a hbuf)) option *)
+(* val consume : dna -> (base * dna) option *)
 let consume hbuf =
   if (length hbuf) > 0 then
     Some (nth hbuf 0, skip hbuf 1)
