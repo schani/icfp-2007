@@ -123,6 +123,38 @@ let rec get_template dna (rna:dna) t_rev =
 
 (****************************************************************************)
 
+let ic_dna = concat_base (dna_from_base I) C;;
+
+let rec quote d =
+  let rec convert d prefix =
+    match consume d with
+	None -> empty_dna
+      | Some (I, d) -> convert d (concat_base prefix C)
+      | Some (C, d) -> convert d (concat_base prefix F)
+      | Some (F, d) -> convert d (concat_base prefix P)
+      | Some (P, d) -> convert d (concat prefix ic_dna)
+  in
+    convert d empty_dna;;
+
+let rec protect l d =
+  if l = 0 then
+    d
+  else
+    protect (l - 1) (quote d);;
+
+let asnat n =
+  let rec convert n prefix =
+    if n = 0 then
+      concat_base prefix P
+    else if (n mod 2) = 1 then
+      convert (n / 2) (concat_base prefix I)
+    else
+      convert (n / 2) (concat_base prefix C)
+  in
+    convert n empty_dna;;
+
+(****************************************************************************)
+
 (*
 let rec execute_loop dna rna = 
   let (p,dna,rna) = pattern dna rna []

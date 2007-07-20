@@ -46,6 +46,9 @@ let subbuf hbuf start stop =
    assert (stop <= (length hbuf));
    SubBuf (hbuf, start, stop));;
 
+let empty_dna =
+  subbuf (dna_from_base I) 1 1;;
+
 (* val concat : dna -> dna -> dna *)
 let concat buf1 buf2 =
   let len1 = length buf1
