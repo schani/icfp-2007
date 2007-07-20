@@ -40,20 +40,25 @@ let rec nth hbuf i =
 	   else
 	     nth buf2 (i - len1));;
 
+(* val skip : 'a hbuf -> int -> 'a hbuf *)
+let rec skip hbuf i =
+  let len = length hbuf
+  in if len <= i then
+      SubBuf (hbuf, len, len)
+    else
+      match hbuf with
+	  ArrayBuf arr -> SubBuf (hbuf, i, len)
+	| SubBuf (sub, start, stop) -> SubBuf (sub, start + i, stop)
+	| ConcatBuf (buf1, buf2, len) ->
+	    let len1 = length buf1
+	    in if (length buf1) < i then
+		skip buf2 (i - len1)
+	      else
+		ConcatBuf (skip buf1 i, buf2, len - i);;
+
 (* val consume : 'a hbuf -> ('a * ('a hbuf)) option *)
 let consume hbuf =
-  let rec rest hbuf =
-    let len = length hbuf
-    in match hbuf with
-	ArrayBuf arr -> SubBuf (hbuf, 1, len)
-      | SubBuf (sub, start, stop) -> SubBuf (sub, start + 1, stop)
-      | ConcatBuf (buf1, buf2, len) ->
-	  if (length buf1) < 1 then
-	    rest buf2
-	  else
-	    ConcatBuf (rest buf1, buf2, len - 1)
-  in    
-    if (length hbuf) > 0 then
-      Some (nth hbuf 0, rest hbuf)
-    else
-      None;;
+  if (length hbuf) > 0 then
+    Some (nth hbuf 0, skip hbuf 1)
+  else
+    None;;
