@@ -1,0 +1,21 @@
+DISTNAME = rna2fuun
+BINFILES = rna2fuun
+SBINFILES =
+LIBFILES =
+DOCFILES = COPYING LICENSE CHANGELOG VERSION 
+OTHERFILES = $(DISTNAME).spec
+SRCFILES = $(shell echo *.ml *.mli *.mll *.mly) Makefile Makefile.ocaml
+DISTFILES = $(DOCFILES) $(OTHERFILES) $(SRCFILES)
+DISTVERSIONFILES =
+MODULES = rna parseintern
+LIBRARIES =
+DISTVERSION = $(shell cat VERSION)
+
+LIBDIRS = 
+BUILDSUBDIRS = 
+REBUILDSUBDIRS = 
+
+INSTALL_PREFIX = /
+
+include ../Makefile.ocaml
+
