@@ -1,6 +1,7 @@
 (* -*- fundamental -*- *)
 
 open Dnabuf
+open Printf
 
 exception Hell;;
 
@@ -244,20 +245,25 @@ let build_env pat dna_orig =
 let matchreplace pat tpl dna =
   match build_env pat dna with
       Some (env, i, dna) ->
-	concat (replace tpl env) dna
+	(print_string "got match!\n";
+	 concat (replace tpl env) dna)
     | None ->
-	dna;;
+	(print_string "no match\n";
+	 dna);;
 
 (****************************************************************************)
 
-let rec execute dna rna =
+let rec execute dna rna i =
   let (dna, rna, pat) = get_pattern dna rna 0 []
   in print_string "pattern: "; print_pattern pat; print_newline ();
     print_string "rna: "; write_dna rna stdout; print_newline ();
     let (dna, rna, tpl) = get_template dna rna []
     in print_string "template: "; print_template tpl; print_newline ();
       print_string "rna: "; write_dna rna stdout; print_newline ();
-      execute (matchreplace pat tpl dna) rna;;
+      let filename = sprintf "endo.%d.dna" i
+      in let file = open_out filename
+      in write_dna dna file; close_out file;
+	execute (matchreplace pat tpl dna) rna (i + 1);;
 
 (*
 let rec execute_loop dna rna = 
