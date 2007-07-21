@@ -233,9 +233,14 @@ let search pat dna =
 		  (match search buf2 (start - len1) (stop - len1) with
 		       Some index -> Some (index + len1)
 		     | None -> None)
-  in
-    search dna 0 (length dna);;
-    
+  in let len = (length dna)
+  in match search dna 0 (length dna) with
+      Some index ->
+	if index + pat_len > len then
+	  None
+	else
+	  Some index
+    | None -> None;;
 
 assert ((search (create "IFI" false) (create "PIPFIFIFI" false)) = (Some 4));;
 assert ((search (create "IFI" false) (create "PIPFIFI" false)) = (Some 4));;
