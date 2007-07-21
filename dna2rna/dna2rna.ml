@@ -246,7 +246,7 @@ let build_env pat dna_orig =
 	    build pat (skip dna (int_of_big_int n)) (i + (int_of_big_int n)) c env
       | P_Search s :: pat ->
 	  let s1 = search s dna
-	  (* and s2 = Dnabuf.search s dna *)
+	    (* and s2 = Dnabuf.search s dna *)
 	  in (* assert (s1 = s2); *)
 	    (match s1 with
 		 Some n ->

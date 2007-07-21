@@ -198,7 +198,7 @@ let search pat dna =
 	      else if index < len1 then
 		(matches buf1 start index len1) && (matches buf2 (start + len1 - index) 0 (stop - len1))
 	      else
-		matches buf2 (start - len1) index (stop - len1)
+		matches buf2 start (index - len1) (stop - len1)
      and search dna start stop =
       if start >= stop then
 	None
@@ -213,7 +213,9 @@ let search pat dna =
 		       search dna (index + 1) stop
 		 | None -> None)
 	  | SubBuf (sub, sub_start, sub_stop) ->
-	      search sub (sub_start + start) (sub_start + stop)
+	      (match search sub (sub_start + start) (sub_start + stop) with
+		   Some index -> Some (index - sub_start)
+		 | None -> None)
 	  | ConcatBuf (buf1, buf2, len) ->
 	      let len1 = length buf1
 	      in if start < len1 then
@@ -235,8 +237,10 @@ let search pat dna =
     search dna 0 (length dna);;
 
 assert ((search (create "IFI" false) (create "PIPFIFIFI" false)) = (Some 4));;
+assert ((search (create "IFI" false) (create "PIPFIFI" false)) = (Some 4));;
 assert ((search (create "IFI" false) (concat (create "PIPFI" false) (create "FIF" false))) = (Some 4));;
 assert ((search (create "IFI" false) (concat (create "PIPI" false) (create "PIFIF" false))) = (Some 5));;
+assert ((search (create "IFI" false) (concat (subbuf (create "PIPICP" false) 1 4) (subbuf (create "PCFIPIFIP" false) 2 6))) = (Some 2));;
 
 (* val read_dna : in_channel -> dna *)
 let read_dna file =
