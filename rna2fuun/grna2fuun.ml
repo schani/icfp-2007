@@ -43,7 +43,7 @@ let meta_instrs_from_rna_instrs = function
 	      work (lnr + 1) (cur :: result)
 		{ mi_rnaline = lnr; mi_instr = x; mi_count = 1 } xs
       in
-	List.rev (work 1 [] { mi_rnaline = 1; mi_instr = x; mi_count = 1 } xs)
+	List.rev (work 2 [] { mi_rnaline = 1; mi_instr = x; mi_count = 1 } xs)
 
 let displayBitmap gui bitmap darea =
   let image = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
