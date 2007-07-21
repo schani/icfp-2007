@@ -13,11 +13,11 @@
    "PIPIIPF" => 'T',
    "PIPIIPP" => 'O',
 
-   "PIPIICP" => 'e',
+   "PIIPICP" => 'e',
 
    "PIIIIIP" => '^',
    "PCCCCCP" => '<',
-   "PFFFFFF" => '>',
+   "PFFFFFP" => '>',
    "PCCIFFP" => '=',
    "PFFICCP" => '-',
    "PIIPIIP" => '!',
