@@ -11,10 +11,15 @@
 
 #define SDL
 
+#include "visu.h"
+#include "target.h"
 
-static	char *cmd_name;
+
 
 #define VERSION "V0.2"
+
+
+static	char *cmd_name;
 
 
 #ifdef	SDL
@@ -22,29 +27,8 @@ static SDL_Surface *screen;
 static Uint8 *raw;
 #endif
 
-enum {
-	DIR_N = 0,
-	DIR_E,
-	DIR_S,
-	DIR_W
-};
 
-struct _bucket {
-	unsigned R;
-	unsigned G;
-	unsigned B;
-	unsigned N;
-	
-	unsigned A;
-	unsigned M;
-	
-	unsigned col;
-};
 
-struct _pos {
-	unsigned X;
-	unsigned Y;
-};
 
 static	struct _bucket bucket;
 
@@ -57,44 +41,11 @@ static	struct _pos mark = {0, 0};
 static	unsigned dir = DIR_E;
 
 
-#define	MAXLINE	4096
-
-
-#define	COL_K	0x000000
-#define	COL_R	0xFF0000
-#define	COL_G	0x00FF00
-#define	COL_Y	0xFFFF00
-#define	COL_B	0x0000FF
-#define	COL_M	0xFF00FF
-#define	COL_C	0x00FFFF
-#define	COL_W	0xFFFFFF
-
-
-#define	ALPHA_T	0x00
-#define	ALPHA_O	0xFF
-
-
-#define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
-#define	MIN(a, b)	(((a) <= (b)) ? (a) : (b))
-
-#define	ABS(a)		(((a) >= 0) ? (a) : -(a))
-
-
-#define	COL(r,g,b,a)	(((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
-
-#define	RVAL(c)		(((c) >> 16) & 0xFF)
-#define	GVAL(c)		(((c) >> 8) & 0xFF)
-#define	BVAL(c)		(((c) >> 0) & 0xFF)
-#define	AVAL(c)		(((c) >> 24) & 0xFF)
-
-
-
-struct _bitmap {
-	unsigned data[600][600];
-};
-
 static	struct _bitmap bitmaps[10];
 static	unsigned layer = 0;
+
+static	struct _bitmap risk;
+
 
 
 
@@ -362,6 +313,35 @@ void	visualize(struct _bitmap *bm)
 }
 
 
+#define	CMP(a,b,l,e,g)			\
+	(((a) == (b)) ? (e) :		\
+	((a) < (b)) ? (l) : (g))
+
+
+void	calc_risk(struct _bitmap *bm, struct _bitmap *result)
+{
+	unsigned row, col;
+	unsigned *src, *dst, *tgt;
+
+	src = bm->data[0];
+	dst = result->data[0];
+	tgt = target.data[0];
+	
+	for (row = 0; row < 600; row++) {
+	    for (col = 0; col < 600; col++) {
+	    	unsigned v0 = (*src++ | 0xFF000000);
+	    	unsigned v1 = *tgt++;
+		
+		*dst++ = COL(
+		    CMP(RVAL(v0), RVAL(v1), 0x80, 0xFF, 0x00),
+		    CMP(GVAL(v0), GVAL(v1), 0x80, 0xFF, 0x00),
+		    CMP(BVAL(v0), BVAL(v1), 0x80, 0xFF, 0x00),
+		    0x00);
+	    }
+	}
+}
+
+
 void	write_ppm(struct _bitmap *bm, FILE *fp)
 {
 	unsigned row, col;
@@ -496,6 +476,12 @@ int	main(int argc, char *argv[])
 	
 	write_ppm(&bitmaps[0], stdout);
 	visualize(&bitmaps[0]);
+	
+	sleep(5);
+	calc_risk(&bitmaps[0], &risk);
+	visualize(&risk);
+	
+	sleep(5);
 	if (opt_sleep)
 	    sleep(opt_sleep);
 	
