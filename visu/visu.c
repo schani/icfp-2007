@@ -12,7 +12,9 @@
 #define SDL
 
 
-#define VERSION "V0.1"
+static	char *cmd_name;
+
+#define VERSION "V0.2"
 
 
 #ifdef	SDL
@@ -210,7 +212,7 @@ unsigned _compose(unsigned c0, unsigned c1)
 	unsigned b1 = BVAL(c1);
 	unsigned a1 = AVAL(c1);
 	
-	unsigned a0i = 255 - a0;
+	register unsigned a0i = 255 - a0;
 	
 	return COL(r0 + (r1 * a0i / 255),
 		   g0 + (g1 * a0i / 255),
@@ -228,8 +230,8 @@ void	do_compose(void)
 	    unsigned cnt = 600*600;
 	    
 	    while (cnt--) {
-		unsigned cs = *src++;
-		unsigned cd = *dst;
+		register unsigned cs = *src++;
+		register unsigned cd = *dst;
 		
 		*dst++ = _compose(cs, cd);
 	    }
@@ -360,7 +362,22 @@ void	visualize(struct _bitmap *bm)
 }
 
 
-static	char *cmd_name;
+void	write_ppm(struct _bitmap *bm, FILE *fp)
+{
+	unsigned row, col;
+	fprintf(fp, "P3\n# CREATOR %s %s\n600 600\n255\n",
+	    cmd_name, VERSION);
+	for (row = 0; row < 600; row++) {
+	    unsigned *ptr = bm->data[row];
+	    
+	    for (col = 0; col < 600; col++) {
+	    	unsigned val = ptr[col];
+		
+	    	fprintf(fp, "%d %d %d\n", RVAL(val), GVAL(val), BVAL(val));
+	    }
+	}
+}
+
 
 static	char opt_compact = 0;
 static	char opt_exitchar = 0;
@@ -477,6 +494,7 @@ int	main(int argc, char *argv[])
 	    step++;
 	}
 	
+	write_ppm(&bitmaps[0], stdout);
 	visualize(&bitmaps[0]);
 	if (opt_sleep)
 	    sleep(opt_sleep);
