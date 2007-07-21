@@ -117,10 +117,10 @@ static inline
 void	do_move(unsigned dir, struct _pos *pos)
 {
 	switch(dir) {
-	case DIR_N: pos->Y = (pos->Y - 1) % 600;	break;
+	case DIR_N: pos->Y = pos->Y ? pos->Y - 1 : 599; break;
 	case DIR_E: pos->X = (pos->X + 1) % 600;	break;
 	case DIR_S: pos->Y = (pos->Y + 1) % 600;	break;
-	case DIR_W: pos->X = (pos->X - 1) % 600;	break;
+	case DIR_W: pos->X = pos->X ? pos->X - 1 : 599;	break;
 	}
 }
 
@@ -365,6 +365,7 @@ static	char *cmd_name;
 static	char opt_compact = 0;
 static	char opt_exitchar = 0;
 static	char opt_interactive = 0;
+static	char opt_step = 0;
 
 
 static	unsigned opt_sleep = 0;
@@ -376,9 +377,10 @@ int	main(int argc, char *argv[])
 	extern int optind;
 	extern char *optarg;
 	int c, errflg = 0;
+	unsigned step = 1;
 	
 	cmd_name = argv[0];
-	while ((c = getopt(argc, argv, "hs:CEI")) != EOF) {
+	while ((c = getopt(argc, argv, "hs:n:CEI")) != EOF) {
 	    switch (c) {
 	    case 'h':
 		fprintf(stderr,
@@ -386,6 +388,7 @@ int	main(int argc, char *argv[])
 		    "options are:\n"
 		    "-h        print this help message\n"
 		    "-s <sec>  sleep <sec> seconds\n"
+		    "-n <num>  visualize every <num> steps\n"
 		    "-C        compact character sequence\n"
 		    "-E        enable exit char '.'\n"
 		    "-I        interactive\n"
@@ -394,6 +397,9 @@ int	main(int argc, char *argv[])
 		break;
 	    case 's':
 		opt_sleep = atoi(optarg);
+		break;
+	    case 'n':
+		opt_step = atoi(optarg);
 		break;
 	    case 'C':
 		opt_compact = 1;
@@ -462,8 +468,13 @@ int	main(int argc, char *argv[])
 
 	    build_cmd(c);
 	
-	    if (opt_interactive)
-		visualize(&bitmaps[layer]);
+	    if (opt_interactive) {
+		if (!opt_step || !(step % opt_step)) {
+		    visualize(&bitmaps[layer]);
+		    fputc('.', stderr);
+	        }
+	    }
+	    step++;
 	}
 	
 	visualize(&bitmaps[0]);
