@@ -27,6 +27,8 @@ let create str =
   in (Buffer.add_string buf str;
       ArrayBuf (buf, len));;
 
+let empty_dna = create "";;
+
 (* val dna_from_base : base -> dna *)
 let dna_from_base b =
   let buf = Buffer.create 16
@@ -40,14 +42,27 @@ let rec length = function
   | ConcatBuf (_, _, len) -> len;;
 
 (* val subbuf : dna -> int -> int -> dna *)
-let subbuf hbuf start stop =
-  (assert (stop >= start);
-   assert (start >= 0);
-   assert (stop <= (length hbuf));
-   SubBuf (hbuf, start, stop));;
+let rec subbuf hbuf start stop =
+  if start = stop then
+    empty_dna
+  else
+    (assert (stop > start);
+     assert (start >= 0);
+     assert (stop <= (length hbuf));
+     match hbuf with
+	 ArrayBuf _ -> SubBuf (hbuf, start, stop)
+       | SubBuf (sub, sub_start, sub_stop) ->
+	   subbuf sub (sub_start + start) (sub_start + stop)
+       | ConcatBuf (buf1, buf2, _) ->
+	   let len1 = length buf1
+	   in if start >= len1 then
+	       subbuf buf2 (start - len1) (stop - len1)
+	     else if stop <= len1 then
+	       subbuf buf1 start stop
+	     else
+	       SubBuf (hbuf, start, stop));;
 
-let empty_dna =
-  subbuf (dna_from_base I) 1 1;;
+     (*ConcatBuf ((subbuf buf1 start len1), (subbuf buf2 0 (stop - len1)), stop - start));; *)
 
 (* val concat : dna -> dna -> dna *)
 let concat buf1 buf2 =
@@ -87,7 +102,7 @@ let rec nth hbuf i =
 let rec skip hbuf i =
   let len = length hbuf
   in if len <= i then
-      SubBuf (hbuf, len, len)
+      empty_dna
     else
       match hbuf with
 	  ArrayBuf (arr, len) -> SubBuf (hbuf, i, len)
@@ -126,3 +141,38 @@ let write_dna buf file =
 		write buf2 (max 0 (start - len1)) (stop - len1))
   in
     write buf 0 (length buf);;
+
+let rec visualize = function
+    ArrayBuf (_, len) -> print_int len
+  | SubBuf (sub, start, stop) -> print_string "("; visualize sub; print_string ","; print_int start; print_string ":"; print_int stop; print_string ")"
+  | ConcatBuf (buf1, buf2, len) -> visualize buf1; print_string "+"; visualize buf2;;
+
+let rec flatten buf =
+  let buf_len = length buf
+  in if buf_len > Sys.max_string_length / 2 then
+      let half = buf_len / 2
+      in concat (flatten (subbuf buf 0 half)) (flatten (subbuf buf half buf_len))
+    else
+      let new_buf = Buffer.create buf_len
+      in let rec blit buf start stop =
+	  match buf with
+	      ArrayBuf (buf, len) ->
+		(assert (stop >= start);
+		 assert (start >= 0);
+		 assert (stop <= len);
+		 assert ((Buffer.length new_buf) + (stop - start) <= buf_len);
+		 if stop > start then
+		   Buffer.add_string new_buf (Buffer.sub buf start (stop - start)))
+	    | SubBuf (sub, sub_start, _) ->
+		blit sub (sub_start + start) (sub_start + stop)
+	    | ConcatBuf (buf1, buf2, len) ->
+		let len1 = length buf1
+		in (if start < len1 then
+		      blit buf1 start (min len1 stop);
+		    if stop > len1 then
+		      blit buf2 (max 0 (start - len1)) (stop - len1))
+      in
+	(* print_string "flattening "; print_int buf_len; print_newline (); *)
+	blit buf 0 buf_len;
+	(* print_string "done"; print_newline (); *)
+	ArrayBuf (new_buf, buf_len);;

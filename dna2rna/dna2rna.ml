@@ -8,8 +8,10 @@ exception Hell;;
 (****************************************************************************)
 
 let finish rna =
-  write_dna rna stdout;
-  exit 0;;
+  let file = open_out "/void/endo/endo.rna"
+  in write_dna rna file;
+    close_out file;
+    exit 0;;
 
 type pattern_item = 
   | P_Base of base
@@ -268,19 +270,28 @@ let matchreplace pat tpl dna =
 (****************************************************************************)
 
 let rec execute dna rna i =
-  let (dna, rna, pat) = get_pattern dna rna 0 []
-  in print_string "pattern: "; print_pattern pat; print_newline ();
-    (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
-    let (dna, rna, tpl) = get_template dna rna []
-    in print_string "template: "; print_template tpl; print_newline ();
-      (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
-      if (i mod 10000) = 9999 then
-	(let filename = sprintf "endo.%d.rna" (i / 10000)
-	 in let file = open_out filename
-	 in write_dna rna file; close_out file);
-      let dna = matchreplace pat tpl dna
-      in 
-	execute dna rna (i + 1);;
+  let the_dna = ref dna
+  and the_rna = ref rna
+  and i = ref i
+  in while true do
+      let (dna, rna, pat) = get_pattern !the_dna !the_rna 0 []
+      in print_string "pattern: "; print_pattern pat; print_newline ();
+	(* print_string "rna: "; write_dna rna stdout; print_newline (); *)
+	let (dna, rna, tpl) = get_template dna rna []
+	in print_string "template: "; print_template tpl; print_newline ();
+	  (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
+	  if (!i mod 100000) = 99999 then
+	    (let filename = sprintf "/void/endo/endo.%d.rna2" (!i / 100000)
+	     in let file = open_out filename
+	     in write_dna rna file; close_out file);
+	  let dna = matchreplace pat tpl dna
+	  in let dna = if (!i mod 2000) = 1999 then (flatten dna) else dna
+	  in let rna = if (!i mod 2000) = 1999 then (flatten rna) else rna
+	  in (* visualize dna; print_newline (); *)
+	    the_dna := dna;
+	    the_rna := rna;
+	    i := !i + 1
+    done;;
 
 (*
 let rec execute_loop dna rna = 
