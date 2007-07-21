@@ -25,6 +25,10 @@
 #define	ABS(a)		(((a) >= 0) ? (a) : -(a))
 
 
+#define	CLAMP(v, a, b)	MAX(a, MIN(b, v))
+
+
+
 #define	COL(r,g,b,a)	(((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 
 #define	RVAL(c)		(((c) >> 16) & 0xFF)

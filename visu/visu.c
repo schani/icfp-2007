@@ -16,7 +16,7 @@
 
 
 
-#define VERSION "V0.3"
+#define VERSION "V0.4"
 
 
 static	char *cmd_name;
@@ -24,6 +24,7 @@ static	char *cmd_name;
 
 #ifdef	SDL
 static SDL_Surface *screen;
+static SDL_Surface *bms[10];
 static Uint8 *raw;
 #endif
 
@@ -32,6 +33,10 @@ static	struct _state master;
 
 static	struct _bitmap risk;
 
+static	FILE *fdata = NULL;
+
+static	unsigned index_cur = 0;
+static	unsigned index_max = -1;
 
 
 void	init_state(struct _state *state)
@@ -316,29 +321,17 @@ void	__color_test(void)
 
 
 
-void	visualize(struct _bitmap *bm)
-{
-#ifdef	SDL
-	SDL_LockSurface(screen);
-#endif
-	memcpy(raw, (void *)bm->data[0],
-		sizeof(struct _bitmap));
-#ifdef	SDL
-	SDL_UnlockSurface(screen);
-	SDL_UpdateRect(screen,0,0,0,0);
-#endif
-}
-
 
 #define	CMP(a,b,l,e,g)			\
 	(((a) == (b)) ? (e) :		\
 	((a) < (b)) ? (l) : (g))
 
 
-void	calc_risk(struct _bitmap *bm, struct _bitmap *result)
+unsigned calc_risk(struct _bitmap *bm, struct _bitmap *result)
 {
 	unsigned row, col;
 	unsigned *src, *dst, *tgt;
+	unsigned val = 0;
 
 	src = bm->data[0];
 	dst = result->data[0];
@@ -346,9 +339,10 @@ void	calc_risk(struct _bitmap *bm, struct _bitmap *result)
 	
 	for (row = 0; row < 600; row++) {
 	    for (col = 0; col < 600; col++) {
-	    	unsigned v0 = (*src++ | 0xFF000000);
-	    	unsigned v1 = *tgt++;
+		unsigned v0 = (*src++ | 0xFF000000);
+		unsigned v1 = *tgt++;
 		
+		if (v0 != v1) val++;
 		*dst++ = COL(
 		    CMP(RVAL(v0), RVAL(v1), 0x80, 0xFF, 0x00),
 		    CMP(GVAL(v0), GVAL(v1), 0x80, 0xFF, 0x00),
@@ -356,6 +350,7 @@ void	calc_risk(struct _bitmap *bm, struct _bitmap *result)
 		    0x00);
 	    }
 	}
+	return val;
 }
 
 
@@ -379,22 +374,223 @@ void	write_ppm(struct _bitmap *bm, FILE *fp)
 static	char opt_compact = 0;
 static	char opt_exitchar = 0;
 static	char opt_interactive = 0;
-static	char opt_step = 0;
-
+static	char opt_writeppm = 0;
+static	char opt_writerisk = 0;
+static	char opt_stepsize = 0;
+static	char opt_novisual = 0;
+static	char opt_showrisk = 0;
 
 static	unsigned opt_sleep = 0;
 
+
+#define UI_QUIT     1
+
+
+static	char ui_stop = 0;
+
+static	unsigned ui_delay = 0;
+static	unsigned ui_stepsize = 10;
+static	unsigned ui_jumpto = 0;
+static	unsigned ui_reload = 0;
+
+
+#define	UI_OUTPUT(v, f, a...)	\
+	printf("%s: " f "\n", v, a);
+
+
+
+
+void	visualize(struct _bitmap *bm)
+{
+	if (opt_novisual)
+	    return;
+#ifdef	SDL
+
+#if 1
+	SDL_LockSurface(screen);
+	memcpy(raw, (void *)bm->data[0],
+		sizeof(struct _bitmap));
+	SDL_UnlockSurface(screen);
+#else
+	if (!(index_cur % 1000))
+	    SDL_BlitSurface(bms[0], &rect, screen, &rect);
+#endif
+
+	// SDL_UpdateRect(screen,0,0,0,0);
+	SDL_Flip(screen);
+#endif
+	UI_OUTPUT("showing", "index %8d", index_cur);
+}
+
+
+int	user_input(void)
+{
+	SDL_Event event;
+	int quit = 0;
+
+	if (ui_stop)
+	    SDL_WaitEvent(&event);
+	else 
+	    SDL_PollEvent(&event);
+
+	switch (event.type) {
+	case SDL_KEYDOWN:
+	    switch (event.key.keysym.sym) {
+	    case SDLK_LEFT:
+		if (ui_jumpto) break;
+		ui_jumpto = CLAMP(index_cur - 3, 0, index_max);
+		break;
+	    case SDLK_RIGHT:
+		if (ui_jumpto) break;
+		ui_jumpto = CLAMP(index_cur + 1, 0, index_max);
+		break;
+	    case SDLK_DOWN:
+		if (ui_jumpto) break;
+		ui_jumpto = CLAMP(index_cur - 21, 0, index_max);
+		break;
+	    case SDLK_UP:
+		if (ui_jumpto) break;
+		ui_jumpto = CLAMP(index_cur + 19, 0, index_max);
+		break;
+	    case SDLK_PAGEDOWN:
+		if (ui_jumpto) break;
+		ui_jumpto = CLAMP(index_cur - 201, 0, index_max);
+		break;
+	    case SDLK_PAGEUP:
+		if (ui_jumpto) break;
+		ui_jumpto = CLAMP(index_cur + 199, 0, index_max);
+		break;
+	    case SDLK_END:
+		if (ui_jumpto) break;
+		ui_jumpto = index_max;
+		break;
+	    case SDLK_HOME:
+		if (ui_jumpto) break;
+		ui_jumpto = 1;
+		break;
+
+	    case SDLK_PLUS:
+		ui_stepsize++;
+		break;
+	    case SDLK_MINUS:
+		if (ui_stepsize)
+		    ui_stepsize--;
+		break;
+	    case SDLK_LESS:
+		ui_delay++;
+		break;
+	    case SDLK_GREATER:
+		if (ui_delay)
+		    ui_delay--;
+		break;
+	    
+	    
+	    case SDLK_SPACE:
+		UI_OUTPUT("paused", "at index %8d", index_cur);
+		ui_stop = 1;
+		break;
+		
+	    case 'r':
+		UI_OUTPUT("reload", "advancing to %d", index_cur);
+		ui_jumpto = index_cur;
+		ui_reload = 1;
+		break;
+	    case 'p':
+		UI_OUTPUT("resume", "from index %8d", index_cur);
+		ui_stop = 0;
+		break;
+
+	    case 'i':
+		break;
+	    case 'q':
+		quit = 1;
+		break;
+
+	    default :
+		break;
+	    }
+	    break;
+
+	case SDL_KEYUP :
+	    switch (event.key.keysym.sym) {
+	    case SDLK_RIGHT:
+	    case SDLK_UP:
+	    case SDLK_PAGEUP:
+	    case SDLK_END:
+		// UI_OUTPUT("advancing", "to index %d", ui_jumpto);
+		break;
+
+	    case SDLK_LEFT:
+	    case SDLK_DOWN:
+	    case SDLK_PAGEDOWN:
+	    case SDLK_HOME:
+		// UI_OUTPUT("returning", "to index %d", ui_jumpto);
+		break;
+
+	    case SDLK_PLUS:
+	    case SDLK_MINUS:
+		UI_OUTPUT("stepsize", "set to %d", ui_stepsize);
+		break;
+
+	    case SDLK_LESS:
+	    case SDLK_GREATER:
+		UI_OUTPUT("delay", "set to %d", ui_delay);
+		break;
+
+	    case 'r':
+		break;
+	    case 'p':
+		break;
+	    case 'i':
+		break;
+	    default :
+		break;
+	    }
+	    break;
+
+
+	case SDL_QUIT :
+	    quit = 1;
+	    break;
+	}
+	return quit;
+}
+
+
+int	input_cmd(FILE *fp)
+{
+	char line[MAXLINE];
+	int c;
+
+	if (opt_compact) {
+	    c = fgetc(fp);
+	    if (c == EOF)
+		return c;
+	} else {
+	    if (!fgets(line, MAXLINE, fp))
+		return EOF;
+	    c = line[0];
+	}
+	return c;
+}
+
+
+void	file_rewind(FILE *fp)
+{
+	init_state(&master);
+	fseek(fp, 0, SEEK_SET);
+	index_cur = 0;
+}
+
+
 int	main(int argc, char *argv[])
 {
-	// int x, y;
-	char line[MAXLINE];
 	extern int optind;
 	extern char *optarg;
 	int c, errflg = 0;
-	unsigned step = 1;
 	
 	cmd_name = argv[0];
-	while ((c = getopt(argc, argv, "hs:n:CEI")) != EOF) {
+	while ((c = getopt(argc, argv, "hs:n:qrCEIRW")) != EOF) {
 	    switch (c) {
 	    case 'h':
 		fprintf(stderr,
@@ -403,9 +599,13 @@ int	main(int argc, char *argv[])
 		    "-h        print this help message\n"
 		    "-s <sec>  sleep <sec> seconds\n"
 		    "-n <num>  visualize every <num> steps\n"
+		    "-q        disable visualization\n"
+		    "-r        show risk information\n"
 		    "-C        compact character sequence\n"
 		    "-E        enable exit char '.'\n"
-		    "-I        interactive\n"
+		    "-I        interactive input\n"
+		    "-R        write risk map to stdout\n"
+		    "-W        write bitmap to stdout\n"
 		    , cmd_name);
 		exit(0);
 		break;
@@ -413,7 +613,13 @@ int	main(int argc, char *argv[])
 		opt_sleep = atoi(optarg);
 		break;
 	    case 'n':
-		opt_step = atoi(optarg);
+		opt_stepsize = atoi(optarg);
+		break;
+	    case 'q':
+		opt_novisual = 1;
+		break;
+	    case 'r':
+		opt_showrisk = 1;
 		break;
 	    case 'C':
 		opt_compact = 1;
@@ -424,6 +630,12 @@ int	main(int argc, char *argv[])
 	    case 'I':
 		opt_interactive = 1;
 		break;
+	    case 'R':
+		opt_writerisk = 1;
+		break;
+	    case 'W':
+		opt_writeppm = 1;
+		break;
 	    case '?':
 	    default:
 		errflg++;
@@ -431,21 +643,44 @@ int	main(int argc, char *argv[])
 	    }
 	}
 
-	// width = atoi(argv[1]);
-	// height = atoi(argv[2]);
+	if (!opt_interactive) {
+	    if (optind == argc) {
+		fprintf(stderr, "missing argument.\n");
+		exit(1);
+	    } else {
+		fdata = fopen(argv[optind], "r");
+	    }
+	}
 
 #ifdef	SDL
+	if (opt_novisual)
+	    goto skip_sdl;
+	
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 	    printf("Unable to initialize SDL: %s\n", SDL_GetError());
 	    exit(1);
 	}
 	atexit(SDL_Quit);
-	screen = SDL_SetVideoMode(WIDTH, HEIGHT, 32, 0);
+	screen = SDL_SetVideoMode(WIDTH, HEIGHT, 32,
+	    SDL_ASYNCBLIT | SDL_DOUBLEBUF);
 	if (screen == NULL) {
 	    printf("Unable to set video mode: %s\n", SDL_GetError());
 	    exit(1);
 	}
 	raw = (Uint8 *)screen->pixels;
+
+	{ 
+	    int i;
+	    
+	    for (i = 0; i < 10; i++) {
+		bms[i] = SDL_CreateRGBSurfaceFrom(
+		    &master.bitmaps[i].data[0],
+		    WIDTH, HEIGHT, 32, WIDTH*4,
+		    0xFF0000, 0xFF00, 0xFF, 0xFF000000);
+	    }
+	}
+	SDL_EnableKeyRepeat(500, 100);
+skip_sdl:
 #endif
 
 /*
@@ -467,44 +702,85 @@ int	main(int argc, char *argv[])
 
 	init_state(&master);
 
-	while (1) {
-	    int c;
-	    
-	    if (opt_compact) {
-		c = fgetc(stdin);
+	if (opt_interactive) {
+	    while (1) {
+		int c = input_cmd(stdin);
+
 		if (c == EOF)
 		    break;
-	    } else {
-		if (!fgets(line, MAXLINE, stdin))
+		if (opt_exitchar && (c == '.'))
 		    break;
-		c = line[0];
-	    }
-	    if (opt_exitchar && (c == '.'))
-	    	break;
 
-	    build_cmd(&master, c);
-	
-	    if (opt_interactive) {
-		if (!opt_step || !(step % opt_step)) {
+		build_cmd(&master, c);
+
+		if (!opt_stepsize || !(index_cur % opt_stepsize)) {
 		    visualize(&master.bitmaps[master.layer]);
 		    fputc('.', stderr);
-	        }
+		}
+		index_cur++;
 	    }
-	    step++;
+	    exit(0);
 	}
 	
-	// write_ppm(&master.bitmaps[0], stdout);
-	visualize(&master.bitmaps[0]);
 	
+	// visualize(&risk);
 	/* 
 	sleep(5);
 	calc_risk(&master.bitmaps[0], &risk);
-	visualize(&risk);
 	
 	sleep(5);
 	*/
+	
+	if (opt_stepsize)
+	    ui_stepsize = opt_stepsize;
+	
+	while (1) {
+	    if (!ui_stop || ui_jumpto) {
+		int c = input_cmd(fdata);
+		
+		build_cmd(&master, c);
+		if (c == EOF)
+		    ui_stop = 1;
+		else {
+		    if (ui_jumpto) {
+			if (ui_jumpto < index_cur) {
+			    file_rewind(fdata);
+			    index_cur = 0;
+			}
+			if (index_cur++ < ui_jumpto)
+			    continue;
+			visualize(&master.bitmaps[master.layer]);
+			ui_jumpto = 0;
+			continue;
+		    } 
+		    if (!ui_stepsize  || !(index_cur % ui_stepsize)) {
+			visualize(&master.bitmaps[master.layer]);
+			if (ui_delay)
+			    usleep(ui_delay);
+		    }
+		    index_cur++;
+		}
+	    }
+	    if (opt_novisual && ui_stop)
+		    break;
+	    else if ((user_input() & UI_QUIT))
+		exit(1);
+	};
+
+	visualize(&master.bitmaps[0]);
+	if (opt_writeppm)
+	    write_ppm(&master.bitmaps[0], stdout);
+	if (opt_writerisk) {
+	    calc_risk(&master.bitmaps[0], &risk);
+	    write_ppm(&risk, stdout);
+	}
+	if (opt_showrisk) {
+	    unsigned val = calc_risk(&master.bitmaps[0], &risk);
+	    fprintf(stdout, "%d", val*10);
+	}
+
+
 	if (opt_sleep)
 	    sleep(opt_sleep);
-	
 	exit(0);
 }
