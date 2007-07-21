@@ -189,7 +189,7 @@ void	tryfill(unsigned x, unsigned y, unsigned col)
 static inline 
 void	add_bitmap(void)
 {
-	if (layer < 10) {
+	if (layer < 9) {
 	    layer++;
 	    memset(bitmaps[layer].data[0],
 		0, sizeof(struct _bitmap));
