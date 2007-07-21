@@ -25,6 +25,8 @@ type gui = {
   drawing : GDraw.drawable;
   update_status_fun : gui -> unit;
   mutable breakPoints : rna_instr list;
+  src_pixbuf : GdkPixbuf.pixbuf option;
+  dest_pixbuf : GdkPixbuf.pixbuf option;
 }
 
 let usage () =
@@ -129,8 +131,8 @@ let setupGui (rna_instrs : rna_instr list) =
     (* instr list container *)
   in let hbImgSelButs = GPack.hbox ~border_width:4 ~spacing:4
     ~packing:vbMain#add ()
-  in let area = GMisc.drawing_area ~width:600 ~height:600
-    ~packing:vbMain#add ()
+  in let areaEventBox = GBin.event_box ~border_width:0
+    ~width:600 ~height:600 ~packing:vbMain#add ()
   in let hbStatus = GPack.hbox ~border_width:4 ~spacing:4
     ~packing:vbMain#add ()
   in let hbCmd = GPack.hbox ~border_width:4 ~spacing:4
@@ -163,6 +165,10 @@ let setupGui (rna_instrs : rna_instr list) =
   in let bitmapsLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let statelistlenlabel = GMisc.label ~text:"RNAs:"
     ~packing:hbStatus#pack ()
+  in let mouseCoordLabel = GMisc.label ~text:"Mouse()"
+    ~packing:hbStatus#pack ()
+  in let area = GMisc.drawing_area ~width:600 ~height:600
+    ~packing:areaEventBox#add ()
   in let drawing = area#misc#realize (); new GDraw.drawable (area#misc#window)
   in let update_status gui =
     let rnaState = gui.rna_state
@@ -177,6 +183,11 @@ let setupGui (rna_instrs : rna_instr list) =
       bitmapsLabel#set_text (string_of_int (List.length rnaState.bitmaps));
       statelistlenlabel#set_text (sprintf "RNA: %i/%i"
 				     gui.currentPos (Array.length meta_instrs))
+  in let mouseMoveCB moEv =
+    mouseCoordLabel#set_text (sprintf "Mouse(%i,%i)"
+				 (int_of_float (GdkEvent.Motion.x moEv))
+				 (int_of_float (GdkEvent.Motion.x moEv)));
+       false
   in let gui = { mainWindow = w;
 		 visual = w#misc#visual;
 		 rna_state = createRNAState ();
@@ -221,6 +232,19 @@ let setupGui (rna_instrs : rna_instr list) =
 			      string_of_instr e.mi_instr;
                               string_of_int e.mi_rnaline])
   in
+       begin
+	 try
+	   gui.src_pixbuf = GdkPixbuf.from_file "/void/source.png"; 
+	 with
+	     _ ->
+	       fprintf stderr "failed to load source.png";
+       end;
+    begin
+      try
+	gui.src_pixbuf = GdkPixbuf.from_file "/void/target.png"
+      with
+	  _ -> ()
+    end;
     breakCombo#set_active 0;
     ignore (breakCombo#connect#changed (breakpointChanged breakCombo gui));
     gui.bitmapSelectorButtons <- createBitmapSelectorButtons ();
@@ -232,12 +256,13 @@ let setupGui (rna_instrs : rna_instr list) =
     ignore (plus100#connect#clicked ~callback:(step gui 100));
     ignore (plus1000#connect#clicked ~callback:(step gui 1000));
     ignore (plus10000#connect#clicked ~callback:(step gui 10000));
+    ignore (areaEventBox#event#connect#motion_notify ~callback:mouseMoveCB);
+    areaEventBox#event#add [`POINTER_MOTION];
     ignore (runto#connect#clicked ~callback:(step ~break:true gui max_int));
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));
     ignore (w#connect#destroy ~callback:GMain.Main.quit);
     ignore (instrList#connect#select_row
 	       ~callback:(fun ~row ~column ~event -> goto_gui row));
-    update_gui gui ()
 
 let _ =
   begin
