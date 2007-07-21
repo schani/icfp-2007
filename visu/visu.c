@@ -776,7 +776,7 @@ skip_sdl:
 	}
 	if (opt_showrisk) {
 	    unsigned val = calc_risk(&master.bitmaps[0], &risk);
-	    fprintf(stdout, "%d", val*10);
+	    fprintf(stdout, "%d\n", val*10);
 	}
 
 
