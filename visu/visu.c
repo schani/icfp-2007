@@ -36,7 +36,7 @@ static	struct _bitmap risk;
 static	FILE *fdata = NULL;
 
 static	unsigned index_cur = 0;
-static	unsigned index_max = -1;
+static	unsigned index_max = 1 << 30;
 
 
 void	init_state(struct _state *state)
@@ -344,9 +344,9 @@ unsigned calc_risk(struct _bitmap *bm, struct _bitmap *result)
 		
 		if (v0 != v1) val++;
 		*dst++ = COL(
-		    CMP(RVAL(v0), RVAL(v1), 0x80, 0xFF, 0x00),
-		    CMP(GVAL(v0), GVAL(v1), 0x80, 0xFF, 0x00),
-		    CMP(BVAL(v0), BVAL(v1), 0x80, 0xFF, 0x00),
+		    CMP(RVAL(v0), RVAL(v1), 0x80, 0x00, 0xFF),
+		    CMP(GVAL(v0), GVAL(v1), 0x80, 0x00, 0xFF),
+		    CMP(BVAL(v0), BVAL(v1), 0x80, 0x00, 0xFF),
 		    0x00);
 	    }
 	}
@@ -438,35 +438,43 @@ int	user_input(void)
 	    switch (event.key.keysym.sym) {
 	    case SDLK_LEFT:
 		if (ui_jumpto) break;
-		ui_jumpto = CLAMP(index_cur - 3, 0, index_max);
+		ui_jumpto = CLAMP(index_cur - 11, 0, index_max);
+		UI_OUTPUT("returning", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_RIGHT:
 		if (ui_jumpto) break;
-		ui_jumpto = CLAMP(index_cur + 1, 0, index_max);
+		ui_jumpto = CLAMP(index_cur + 9, 0, index_max);
+		UI_OUTPUT("advancing", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_DOWN:
 		if (ui_jumpto) break;
-		ui_jumpto = CLAMP(index_cur - 21, 0, index_max);
+		ui_jumpto = CLAMP(index_cur - 101, 0, index_max);
+		UI_OUTPUT("returning", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_UP:
 		if (ui_jumpto) break;
-		ui_jumpto = CLAMP(index_cur + 19, 0, index_max);
+		ui_jumpto = CLAMP(index_cur + 99, 0, index_max);
+		UI_OUTPUT("advancing", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_PAGEDOWN:
 		if (ui_jumpto) break;
-		ui_jumpto = CLAMP(index_cur - 201, 0, index_max);
+		ui_jumpto = CLAMP(index_cur - 1001, 0, index_max);
+		UI_OUTPUT("returning", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_PAGEUP:
 		if (ui_jumpto) break;
-		ui_jumpto = CLAMP(index_cur + 199, 0, index_max);
+		ui_jumpto = CLAMP(index_cur + 999, 0, index_max);
+		UI_OUTPUT("advancing", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_END:
 		if (ui_jumpto) break;
 		ui_jumpto = index_max;
+		UI_OUTPUT("advancing", "to index %d", ui_jumpto);
 		break;
 	    case SDLK_HOME:
 		if (ui_jumpto) break;
 		ui_jumpto = 1;
+		UI_OUTPUT("returning", "to index %d", ui_jumpto);
 		break;
 
 	    case SDLK_PLUS:
@@ -739,9 +747,12 @@ skip_sdl:
 		int c = input_cmd(fdata);
 		
 		build_cmd(&master, c);
-		if (c == EOF)
+		if (c == EOF) {
 		    ui_stop = 1;
-		else {
+		    index_max = index_cur;
+		    visualize(&master.bitmaps[master.layer]);
+		    ui_jumpto = 0;
+		} else {
 		    if (ui_jumpto) {
 			if (ui_jumpto < index_cur) {
 			    file_rewind(fdata);
