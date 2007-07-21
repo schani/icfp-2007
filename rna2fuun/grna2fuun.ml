@@ -10,7 +10,7 @@ open Parseintern
 type gui = {
   mainWindow : GWindow.window;
   visual : Gdk.visual;
-  mutable bitmapSelectorButtons : GButton.button array;
+  mutable bitmapSelectorButtons : GButton.toggle_button array;
   mutable rna_state : rna_state;
   instructions : rna_instr array;
   mutable currentPos : int;
@@ -27,7 +27,7 @@ let displayBitmap gui bitmap darea =
   let image = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
     ~width:600 ~height:600
   in
-    for y = 0 to 199 do
+    for y = 0 to 599 do
       for x = 0 to 599 do
 	let ((r,g,b), a) = bitmap.(y).(x)
 	in
@@ -42,12 +42,29 @@ let displayDreck gui =
   gui.drawing#set_foreground (`NAME "red");
   gui.drawing#rectangle ~filled:true ~x:100 ~y:100 ~width:50 ~height:50 ()
 
+let adjustImageSelectorButtons gui =
+  let bitmap_nr = List.length gui.rna_state.bitmaps
+  in
+    if gui.currentBitmap >= bitmap_nr then
+      gui.currentBitmap <- bitmap_nr - 1;
+    for i = 0 to 9 do
+      let b = gui.bitmapSelectorButtons.(i)
+      in
+	b#misc#set_sensitive (if i < bitmap_nr then true else false);
+	if i != gui.currentBitmap && b#active then
+	  b#set_active false
+	else
+	  if i == gui.currentBitmap && (not b#active) then
+	    b#set_active true
+    done
+
 let update_gui gui () =
 (*  displayDreck gui *)
+  adjustImageSelectorButtons gui;
   displayBitmap gui (List.nth gui.rna_state.bitmaps
 			gui.currentBitmap) gui.drawing;
   gui.update_status_fun gui
-(*  displayBitmapManually gui (List.hd gui.rna_state.bitmaps) *)
+    (*  displayBitmapManually gui (List.hd gui.rna_state.bitmaps) *)
 
 let redraw_gui gui _ =
   update_gui gui ();
@@ -65,14 +82,6 @@ let step gui i () =
   in
     step_intern i;
     update_gui gui ()
-
-let adjustImageSelectorButtons gui =
-  let bitmap_nr = List.length gui.rna_state.bitmaps
-  in
-    for i = 0 to 9 do
-      gui.bitmapSelectorButtons.(i)#misc#set_sensitive
-	(if i < bitmap_nr then true else false)
-    done
 
 let setupGui rna_instrs =
   let w = GWindow.window ~title:"grna2fuun"
@@ -124,8 +133,7 @@ let setupGui rna_instrs =
       dirLabel#set_text (string_of_dir rnaState.dir);
       bitmapsLabel#set_text (string_of_int (List.length rnaState.bitmaps));
       statelistlenlabel#set_text (sprintf "RNA: %i/%i"
-				     gui.currentPos (Array.length rna_instrs));
-      adjustImageSelectorButtons gui
+				     gui.currentPos (Array.length rna_instrs))
   in let gui = { mainWindow = w;
 		 visual = w#misc#visual;
 		 rna_state = createRNAState ();
@@ -136,18 +144,22 @@ let setupGui rna_instrs =
 		 bitmapSelectorButtons = [| |];
 		 update_status_fun = update_status;}
   in let select_bitmap nr () =
-    if nr != gui.currentBitmap then begin
+    if nr != gui.currentBitmap &&
+      gui.bitmapSelectorButtons.(nr)#active then begin
+      fprintf stderr "button %i clicked\n" nr;
+      flush stderr;
       gui.currentBitmap <- nr;
+      adjustImageSelectorButtons gui;
       update_gui gui ()
     end
   in let createBitmapSelectorButtons () =
-    let a = Array.create 10 (GButton.button ())
+    let a = Array.create 10 (GButton.toggle_button ())
     in
       for i = 0 to 9 do
-	let b = GButton.button ~label:("bitm"^(string_of_int i))
+	let b = GButton.toggle_button ~label:("bitm"^(string_of_int i))
 	  ~packing:hbImgSelButs#pack ()
 	in
-	  ignore (b#connect#clicked ~callback:(select_bitmap i));
+	  ignore (b#connect#toggled ~callback:(select_bitmap i));
 	  a.(i) <- b
       done;
       a

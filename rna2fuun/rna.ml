@@ -223,16 +223,29 @@ let line st ((x0, y0) : pos) ((x1, y1) : pos) =
 
 let rec fill st (initial : pixel) = function
     [] -> ()
-  | (p : pos) :: ps ->
+  | (x,y) :: ps when x < 0 || x > 599 || y < 0 || y > 599 ->
+      fill st initial ps
+  | p :: ps ->
       let x, y = p
       in
-	if getPixel st p == initial then
+	if (getPixel st p) == initial then begin
+	  setPixel st p;
 	  fill st initial
 	    ((x - 1, y) :: (x + 1, y) :: (x, y - 1) :: (x, y + 1) :: ps)
+	end
 	else
 	  fill st initial ps
 
-let rec orig_fill st (p : pos) (initial : pixel) =
+let tryfill st =
+  let neu = currentPixel st
+  and old = getPixel st st.position
+  in
+    if neu != old
+    then
+      fill st old [st.position]
+
+    (*
+  let rec orig_fill st (p : pos) (initial : pixel) =
   let x,y = p
   in
     if getPixel st p == initial then
@@ -242,14 +255,7 @@ let rec orig_fill st (p : pos) (initial : pixel) =
 	if y > 0 then orig_fill st (x, y - 1) initial;
 	if y < 599 then orig_fill st (x, y + 1) initial;
       end
-
-let tryfill st =
-  let neu = currentPixel st
-  and old = getPixel st st.position
-  in
-    if neu != old
-    then
-      fill st old [st.position]
+*)
 
 let addBitmap st (b : bitmap) =
   if (List.length st.bitmaps) < 10 then
