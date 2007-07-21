@@ -69,14 +69,14 @@ let string_of_rgb = function
 let string_of_instr = function
   | RI_RGB c -> string_of_rgb c
   | RI_Alpha a -> "Alpha:"^(string_of_int a)
-  | RI_ClearBucket -> "ClearBucket"
-  | RI_RotateClockwise -> "RotClockWise"
-  | RI_RotateCounterClockwise -> "RotCounterCW"
+  | RI_ClearBucket -> "Clear"
+  | RI_RotateClockwise -> "Rot ->"
+  | RI_RotateCounterClockwise -> "<- Rot"
   | RI_Move -> "Move"
   | RI_Mark -> "Mark"
   | RI_Line -> "Line"
   | RI_Fill -> "Fill"
-  | RI_AddBitmap -> "AddBitmap"
+  | RI_AddBitmap -> "AddBmap"
   | RI_Compose -> "Compose"
   | RI_Clip -> "Clip"
   | RI_Ignore -> "Ignore"

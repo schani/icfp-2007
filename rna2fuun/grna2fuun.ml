@@ -11,6 +11,7 @@ open Parseintern
 type meta_instr = {
   mi_instr : rna_instr;
   mi_count : int;
+  mi_rnaline : int;
 }
 
 type gui = {
@@ -33,15 +34,16 @@ let usage () =
 let meta_instrs_from_rna_instrs = function
     [] -> []
   | x :: xs ->
-      let rec work result cur = function
+      let rec work lnr result cur = function
 	  [] -> cur :: result
 	| x :: xs ->
 	    if cur.mi_instr = x then
-	      work result { cur with mi_count = cur.mi_count + 1 } xs
+	      work (lnr + 1) result { cur with mi_count = cur.mi_count + 1 } xs
 	    else
-	      work (cur :: result) { mi_instr = x; mi_count = 1 } xs
+	      work (lnr + 1) (cur :: result)
+		{ mi_rnaline = lnr; mi_instr = x; mi_count = 1 } xs
       in
-	List.rev (work [] { mi_instr = x; mi_count = 1 } xs)
+	List.rev (work 1 [] { mi_rnaline = 1; mi_instr = x; mi_count = 1 } xs)
 
 let displayBitmap gui bitmap darea =
   let image = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
@@ -135,7 +137,8 @@ let setupGui (rna_instrs : rna_instr list) =
     ~packing:vbMain#add ()
   in let instrListBar = GRange.scrollbar `VERTICAL
     ~packing:(hb1#pack ~from:`END) ()
-  in let instrList = GList.clist ~titles:["Number";"Count";"Command"]
+  in let instrList = GList.clist
+    ~titles:["Number";"Count";"Command";"RNA-Line"]
     ~shadow_type:`OUT ~vadjustment:instrListBar#adjustment
     ~packing:(hb1#pack ~expand:true) ()
   in let reset = GButton.button ~label:"reset" ~packing:hbCmd#pack ()
@@ -215,7 +218,8 @@ let setupGui (rna_instrs : rna_instr list) =
   in let mi_convert i e =
     ignore (instrList#append [string_of_int i;
 			      string_of_int e.mi_count;
-			      string_of_instr e.mi_instr])
+			      string_of_instr e.mi_instr;
+                              string_of_int e.mi_rnaline])
   in
     breakCombo#set_active 0;
     ignore (breakCombo#connect#changed (breakpointChanged breakCombo gui));
