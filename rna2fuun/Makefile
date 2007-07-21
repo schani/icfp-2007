@@ -1,5 +1,5 @@
 DISTNAME = rna2fuun
-BINFILES = rna2fuun
+BINFILES = rna2fuun grna2fuun
 SBINFILES =
 LIBFILES =
 DOCFILES = COPYING LICENSE CHANGELOG VERSION 
@@ -9,13 +9,13 @@ DISTFILES = $(DOCFILES) $(OTHERFILES) $(SRCFILES)
 DISTVERSIONFILES =
 MODULES = rna parseintern
 LIBRARIES =
+LIBRARIES-grna2fuun = lablgtk2/lablgtk
 DISTVERSION = $(shell cat VERSION)
 
-LIBDIRS = 
+LIBDIRS = /usr/lib/ocaml/lablgtk2
 BUILDSUBDIRS = 
 REBUILDSUBDIRS = 
 
 INSTALL_PREFIX = /
 
 include ../Makefile.ocaml
-

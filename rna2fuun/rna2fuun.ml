@@ -14,4 +14,7 @@ let usage () =
 let _ =
   if Array.length Sys.argv != 2 then
     usage ();
-  Parseintern.read_trace Sys.argv.(1)
+  let heisler = Parseintern.read_trace Sys.argv.(1)
+  in let state = createRNAState ()
+  in
+       List.map (apply_instr state) heisler
