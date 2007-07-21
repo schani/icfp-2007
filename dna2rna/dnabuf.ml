@@ -226,7 +226,7 @@ let search pat dna =
 			else
 			  search dna (index + 1) stop
 		    | None ->
-			(match search buf2 (start - len1) (stop - len1) with
+			(match search buf2 0 (stop - len1) with
 			     Some index -> Some (index + len1)
 			   | None -> None)
 		else
@@ -242,7 +242,7 @@ assert ((search (create "IFI" false) (create "PIPFIFI" false)) = (Some 4));;
 assert ((search (create "IFI" false) (concat (create "PIPFI" false) (create "FIF" false))) = (Some 4));;
 assert ((search (create "IFI" false) (concat (create "PIPI" false) (create "PIFIF" false))) = (Some 5));;
 assert ((search (create "IFI" false) (concat (subbuf (create "PIPICP" false) 1 4) (subbuf (create "PCFIPIFIP" false) 2 6))) = (Some 2));;
-assert ((search (create "I" false)   (concat (create "P" false) (create "P" false)))= (Some 0));;
+assert ((search (create "I" false)   (concat (create "P" false) (create "P" false))) = None);;
 (* assert ((search (create "I" false)   (concat (create "P" false) (create "P" false)))= (Some 0));; *)
 (* assert ((search (create "I" false)   (concat (subbuf (create "P" false) 0 1) (create "P" false)))= (Some 0));; *)
 
