@@ -91,3 +91,6 @@
   (let ((str (asnat const nil)))
     (compile-rule `((group (? ,prefix)) ,(make-string (length str) :initial-element #\I))
 		  `((0 _ 0) ,str))))
+
+(defun guide-page (page-num)
+  (replace-constant "IFPCFFP" page-num))
