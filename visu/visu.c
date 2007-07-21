@@ -43,11 +43,14 @@ static	char opt_exitchar = 0;
 static	char opt_interactive = 0;
 static	char opt_writeppm = 0;
 static	char opt_writerisk = 0;
-static	char opt_stepsize = 0;
 static	char opt_novisual = 0;
 static	char opt_showrisk = 0;
 static	char opt_blackwhite = 0;
+static	char opt_ppmbefore = 0;
+static	char opt_ppmafter = 0;
 
+static	unsigned opt_stepsize = 0;
+static	unsigned opt_maxindex = 0;
 static	unsigned opt_sleep = 0;
 
 
@@ -617,7 +620,7 @@ int	main(int argc, char *argv[])
 	int c, errflg = 0;
 	
 	cmd_name = argv[0];
-	while ((c = getopt(argc, argv, "hbs:n:qrCEIRW")) != EOF) {
+	while ((c = getopt(argc, argv, "hbm:qrs:wA:B:CEIRW")) != EOF) {
 	    switch (c) {
 	    case 'h':
 		fprintf(stderr,
@@ -625,10 +628,13 @@ int	main(int argc, char *argv[])
 		    "options are:\n"
 		    "-h        print this help message\n"
 		    "-b        black and white mode\n"
-		    "-s <sec>  sleep <sec> seconds\n"
-		    "-n <num>  visualize every <num> steps\n"
+		    "-m <num>  stop after <num> commands\n"
 		    "-q        disable visualization\n"
 		    "-r        show risk information\n"
+		    "-s <num>  visualize every <num> steps\n"
+		    "-w <sec>  wait <sec> seconds\n"
+		    "-A <cmd>  write ppm after command <cmd>\n"
+		    "-B <cmd>  write ppm before command <cmd>\n"
 		    "-C        compact character sequence\n"
 		    "-E        enable exit char '.'\n"
 		    "-I        interactive input\n"
@@ -640,17 +646,26 @@ int	main(int argc, char *argv[])
 	    case 'b':
 		opt_blackwhite = 1;
 		break;
-	    case 's':
-		opt_sleep = atoi(optarg);
-		break;
-	    case 'n':
-		opt_stepsize = atoi(optarg);
+	    case 'm':
+		opt_maxindex = atoi(optarg);
 		break;
 	    case 'q':
 		opt_novisual = 1;
 		break;
 	    case 'r':
 		opt_showrisk = 1;
+		break;
+	    case 's':
+		opt_stepsize = atoi(optarg);
+		break;
+	    case 'w':
+		opt_sleep = atoi(optarg);
+		break;
+	    case 'A':
+		opt_ppmafter = optarg[0];
+		break;
+	    case 'B':
+		opt_ppmbefore = optarg[0];
 		break;
 	    case 'C':
 		opt_compact = 1;
@@ -742,7 +757,11 @@ skip_sdl:
 		if (opt_exitchar && (c == '.'))
 		    break;
 
+		if (opt_ppmbefore == c)
+		    write_ppm(&master.bitmaps[master.layer], stdout);
 		build_cmd(&master, c);
+		if (opt_ppmafter == c)
+		    write_ppm(&master.bitmaps[master.layer], stdout);
 
 		if (!opt_stepsize || !(index_cur % opt_stepsize)) {
 		    visualize(&master.bitmaps[master.layer]);
@@ -769,7 +788,12 @@ skip_sdl:
 	    if (!ui_stop || ui_jumpto) {
 		int c = input_cmd(fdata);
 		
+		if (opt_ppmbefore == c)
+		    write_ppm(&master.bitmaps[master.layer], stdout);
 		build_cmd(&master, c);
+		if (opt_ppmafter == c)
+		    write_ppm(&master.bitmaps[master.layer], stdout);
+
 		if (c == EOF) {
 		    ui_stop = 1;
 		    index_max = index_cur;
@@ -793,6 +817,8 @@ skip_sdl:
 			    usleep(ui_delay);
 		    }
 		    index_cur++;
+		    if (index_cur == opt_maxindex)
+			break;
 		}
 	    }
 	    if (opt_novisual && ui_stop)
@@ -801,15 +827,18 @@ skip_sdl:
 		exit(1);
 	};
 
-	visualize(&master.bitmaps[0]);
+	if (c == EOF)
+	    master.layer = 0;
+
+	visualize(&master.bitmaps[master.layer]);
 	if (opt_writeppm)
-	    write_ppm(&master.bitmaps[0], stdout);
+	    write_ppm(&master.bitmaps[master.layer], stdout);
 	if (opt_writerisk) {
-	    calc_risk(&master.bitmaps[0], &risk);
+	    calc_risk(&master.bitmaps[master.layer], &risk);
 	    write_ppm(&risk, stdout);
 	}
 	if (opt_showrisk) {
-	    unsigned val = calc_risk(&master.bitmaps[0], &risk);
+	    unsigned val = calc_risk(&master.bitmaps[master.layer], &risk);
 	    fprintf(stdout, "%d\n", val*10);
 	}
 
