@@ -2,7 +2,7 @@ open Dnabuf;;
 open Dna2rna;;
 
 let dna = read_dna stdin
-in execute dna empty_dna 1;;
+in execute dna Rna.empty_rna 1;;
 
 (*
 let buf = dna_from_base I

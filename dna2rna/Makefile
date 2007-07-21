@@ -7,7 +7,7 @@ OTHERFILES = $(DISTNAME).spec
 SRCFILES = $(shell echo *.ml *.mli *.mll *.mly) Makefile Makefile.ocaml
 DISTFILES = $(DOCFILES) $(OTHERFILES) $(SRCFILES)
 DISTVERSIONFILES =
-MODULES = dnabuf dna2rna
+MODULES =  dnabuf rna dna2rna 
 LIBRARIES =
 DISTVERSION = $(shell cat VERSION)
 

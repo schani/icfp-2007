@@ -9,7 +9,7 @@ exception Hell;;
 
 let finish rna =
   let file = open_out "/void/endo/endo.rna"
-  in write_dna rna file;
+  in Rna.write_rna rna file;
     close_out file;
     exit 0;;
 
@@ -59,7 +59,7 @@ let rec print_template = function
 
 (****************************************************************************)
 
-let rec get_nat (dna:dna) (rna:dna) = 
+let rec get_nat (dna:dna) rna = 
   match consume dna with
     | None -> finish rna
     | Some(P,dna) -> (0,dna)
@@ -83,7 +83,7 @@ let get_consts dna_orig =
 
 (****************************************************************************)
 
-(* val get_pattern: dna -> dna -> int -> pattern -> (dna * dna * pattern) *)
+(* val get_pattern: dna -> rna -> int -> pattern -> (dna * dna * pattern) *)
 let rec get_pattern dna rna lvl p_rev =
   match consume dna with
     | None -> finish rna
@@ -113,14 +113,14 @@ let rec get_pattern dna rna lvl p_rev =
 			get_pattern dna rna (lvl-1) (P_ParenR::p_rev)
 		  | Some(I,dna) -> 
 		      let first7 = subbuf dna 0 7 in 
-			get_pattern (skip dna 7) (concat rna first7) lvl p_rev
+			get_pattern (skip dna 7) (Rna.concat_rna rna first7) lvl p_rev
 	       )
 	)
 
 (****************************************************************************)
 
-(* val get_template: dna -> dna -> template -> (dna * dna * template) *)
-let rec get_template dna (rna:dna) t_rev =
+(* val get_template: dna -> rna -> template -> (dna * dna * template) *)
+let rec get_template dna rna t_rev =
   match consume dna with
     | Some(C,dna) -> 
 	get_template dna rna ((T_Base I)::t_rev)
@@ -146,7 +146,7 @@ let rec get_template dna (rna:dna) t_rev =
 		      let (n,dna) = get_nat dna rna in 
 			get_template dna rna ((T_Abs(n))::t_rev)
 		  | Some(I,dna) -> 
-		      let rna = concat rna (subbuf dna 0 7) in
+		      let rna = Rna.concat_rna rna (subbuf dna 0 7) in
 		      let dna = skip dna 7 in
 			get_template dna rna t_rev
 		  | None -> finish rna
@@ -284,10 +284,10 @@ let rec execute dna rna i =
 	  if (!i mod 100000) = 99999 then
 	    (let filename = sprintf "/void/endo/endo.%d.rna2" (!i / 100000)
 	     in let file = open_out filename
-	     in write_dna rna file; close_out file);
+	     in Rna.write_rna rna file; close_out file);
 	  let dna = matchreplace pat tpl dna
 	  in let dna = if (!i mod 2000) = 1999 then (flatten dna) else dna
-	  in let rna = if (!i mod 2000) = 1999 then (flatten rna) else rna
+	  (* in let rna = if (!i mod 2000) = 1999 then (flatten rna) else rna *)
 	  in (* visualize dna; print_newline (); *)
 	    the_dna := dna;
 	    the_rna := rna;
