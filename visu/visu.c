@@ -16,7 +16,7 @@
 
 
 
-#define VERSION "V0.4"
+#define VERSION "V0.5"
 
 
 static	char *cmd_name;
@@ -37,6 +37,21 @@ static	FILE *fdata = NULL;
 
 static	unsigned index_cur = 0;
 static	unsigned index_max = 1 << 30;
+
+static	char opt_compact = 0;
+static	char opt_exitchar = 0;
+static	char opt_interactive = 0;
+static	char opt_writeppm = 0;
+static	char opt_writerisk = 0;
+static	char opt_stepsize = 0;
+static	char opt_novisual = 0;
+static	char opt_showrisk = 0;
+static	char opt_blackwhite = 0;
+
+static	unsigned opt_sleep = 0;
+
+
+
 
 
 void	init_state(struct _state *state)
@@ -68,7 +83,7 @@ void	recalc_col(struct _bucket *b)
 	
 	unsigned col = COL(rc*ac/255, gc*ac/255, bc*ac/255, ac);
 
-	b->col = col;
+	b->col = opt_blackwhite ? (col ? 0xFFFFFF : 0x0) : col;
 }
 
 
@@ -343,11 +358,13 @@ unsigned calc_risk(struct _bitmap *bm, struct _bitmap *result)
 		unsigned v1 = *tgt++;
 		
 		if (v0 != v1) val++;
-		*dst++ = COL(
+		*dst = COL(
 		    CMP(RVAL(v0), RVAL(v1), 0x80, 0x00, 0xFF),
 		    CMP(GVAL(v0), GVAL(v1), 0x80, 0x00, 0xFF),
 		    CMP(BVAL(v0), BVAL(v1), 0x80, 0x00, 0xFF),
 		    0x00);
+		if (opt_blackwhite && *dst) *dst = 0xFFFFFF;
+		dst++;
 	    }
 	}
 	return val;
@@ -370,17 +387,6 @@ void	write_ppm(struct _bitmap *bm, FILE *fp)
 	}
 }
 
-
-static	char opt_compact = 0;
-static	char opt_exitchar = 0;
-static	char opt_interactive = 0;
-static	char opt_writeppm = 0;
-static	char opt_writerisk = 0;
-static	char opt_stepsize = 0;
-static	char opt_novisual = 0;
-static	char opt_showrisk = 0;
-
-static	unsigned opt_sleep = 0;
 
 
 #define UI_QUIT     1
@@ -598,13 +604,14 @@ int	main(int argc, char *argv[])
 	int c, errflg = 0;
 	
 	cmd_name = argv[0];
-	while ((c = getopt(argc, argv, "hs:n:qrCEIRW")) != EOF) {
+	while ((c = getopt(argc, argv, "hbs:n:qrCEIRW")) != EOF) {
 	    switch (c) {
 	    case 'h':
 		fprintf(stderr,
 		    "This is %s " VERSION "\n"
 		    "options are:\n"
 		    "-h        print this help message\n"
+		    "-b        black and white mode\n"
 		    "-s <sec>  sleep <sec> seconds\n"
 		    "-n <num>  visualize every <num> steps\n"
 		    "-q        disable visualization\n"
@@ -616,6 +623,9 @@ int	main(int argc, char *argv[])
 		    "-W        write bitmap to stdout\n"
 		    , cmd_name);
 		exit(0);
+		break;
+	    case 'b':
+		opt_blackwhite = 1;
 		break;
 	    case 's':
 		opt_sleep = atoi(optarg);
