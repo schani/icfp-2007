@@ -2,6 +2,7 @@
 
 open Dnabuf
 open Printf
+open Big_int
 
 exception Hell;;
 
@@ -15,19 +16,22 @@ let finish rna =
 
 type pattern_item = 
   | P_Base of base
-  | P_Skip of int
+  | P_Skip of big_int
   | P_Search of dna
   | P_ParenL
   | P_ParenR
 
 type pattern = pattern_item list
 
+let print_big_int n =
+  print_string (string_of_big_int n)
+
 let rec print_pattern = function
     [] -> ()
   | P_Base base :: pat ->
       print_char (base_to_char base); print_pattern pat
   | P_Skip n :: pat ->
-      print_string "[!"; print_int n; print_string "]"; print_pattern pat
+      print_string "[!"; print_big_int n; print_string "]"; print_pattern pat
   | P_Search dna :: pat ->
       print_string "[?"; write_dna dna stdout; print_string "]"; print_pattern pat
   | P_ParenL :: pat ->
@@ -43,8 +47,8 @@ let rec print_pattern = function
 
 type template_item =
   | T_Base of base
-  | T_Sub of int * int
-  | T_Abs of int
+  | T_Sub of big_int * big_int
+  | T_Abs of big_int
 
 type template = template_item list
 
@@ -53,19 +57,19 @@ let rec print_template = function
   | T_Base base :: tpl ->
       print_char (base_to_char base); print_template tpl
   | T_Sub (n, l) :: tpl ->
-      print_string "("; print_int n; print_string "_"; print_int l; print_string ")"; print_template tpl
+      print_string "("; print_big_int n; print_string "_"; print_big_int l; print_string ")"; print_template tpl
   | T_Abs n :: tpl ->
-      print_string "|"; print_int n; print_string "|"; print_template tpl
+      print_string "|"; print_big_int n; print_string "|"; print_template tpl
 
 (****************************************************************************)
 
 let rec get_nat (dna:dna) rna = 
   match consume dna with
     | None -> finish rna
-    | Some(P,dna) -> (0,dna)
+    | Some(P,dna) -> (zero_big_int, dna)
     | Some(I,dna) 
-    | Some(F,dna) -> let (n,dna) = get_nat dna rna in (n*2,dna)
-    | Some(C,dna) -> let (n,dna) = get_nat dna rna in (n*2+1,dna)
+    | Some(F,dna) -> let (n,dna) = get_nat dna rna in (add_big_int n n, dna)
+    | Some(C,dna) -> let (n,dna) = get_nat dna rna in (add_big_int unit_big_int (add_big_int n n), dna)
 
 let get_consts dna_orig =
   let rec work dna_orig s =
@@ -181,13 +185,19 @@ let rec asnat n prefix =
 
 (****************************************************************************)
 
+let env_nth env n =
+  try
+    List.nth env (int_of_big_int n)
+  with
+      _ -> empty_dna;;
+
 let replace tpl e =
   let rec work tpl r =
     match tpl with
 	[] -> r
       | (T_Base base) :: tpl -> work tpl (concat_base r base)
-      | (T_Sub (n, l)) :: tpl -> work tpl (protect l (List.nth e n) r)
-      | (T_Abs n) :: tpl -> work tpl (asnat (length (List.nth e n)) r)
+      | (T_Sub (n, l)) :: tpl -> work tpl (protect (int_of_big_int l) (env_nth e n) r)
+      | (T_Abs n) :: tpl -> work tpl (asnat (length (env_nth e n)) r)
   in
     work tpl empty_dna;;
 
@@ -230,16 +240,19 @@ let build_env pat dna_orig =
 		 else
 		   None)
       | P_Skip n :: pat ->
-	  if n > (length dna) then
+	  if (not (is_int_big_int n)) || ((int_of_big_int n) > (length dna)) then
 	    None
 	  else
-	    build pat (skip dna n) (i + n) c env
+	    build pat (skip dna (int_of_big_int n)) (i + (int_of_big_int n)) c env
       | P_Search s :: pat ->
-	  (match search s dna with
-	       Some n ->
-		 let n = n + (length s)
-		 in build pat (skip dna n) (i + n) c env
-	     | None -> None)
+	  let s1 = search s dna
+	  (* and s2 = Dnabuf.search s dna *)
+	  in (* assert (s1 = s2); *)
+	    (match s1 with
+		 Some n ->
+		   let n = n + (length s)
+		   in build pat (skip dna n) (i + n) c env
+	       | None -> None)
       | P_ParenL :: pat ->
 	  build pat dna i (i :: c) env
       | P_ParenR :: pat ->
@@ -274,6 +287,7 @@ let rec execute dna rna i =
   and the_rna = ref rna
   and i = ref i
   in while true do
+      (* print_string "dna: "; write_dna !the_dna stdout; print_newline (); *)
       let (dna, rna, pat) = get_pattern !the_dna !the_rna 0 []
       in print_string "pattern: "; print_pattern pat; print_newline ();
 	(* print_string "rna: "; write_dna rna stdout; print_newline (); *)

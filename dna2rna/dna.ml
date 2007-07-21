@@ -5,6 +5,13 @@ let dna = read_dna stdin
 in execute dna Rna.empty_rna 1;;
 
 (*
+let (c, dna) = get_consts dna
+in write_dna c stdout;;
+*)
+
+ (* *)
+
+(*
 let buf = dna_from_base I
 in write_dna (replace [T_Base F; T_Sub (0, 0); T_Abs (0)] [create "ICI"]) stdout;;
 *)

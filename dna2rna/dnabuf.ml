@@ -127,32 +127,6 @@ let consume hbuf =
   else
     None;;
 
-(* val read_dna : in_channel -> dna *)
-let read_dna file =
-  create (input_line file) true;;
-
-(* val write_dna : dna -> out_channel -> unit *)
-let write_dna buf file =
-  let rec write buf start stop =
-    match buf with
-	ArrayBuf (buf, _, _) ->
-	  output_string file (Buffer.sub buf start (stop - start))
-      | SubBuf (sub, sub_start, _) ->
-	  write sub (sub_start + start) (sub_start + stop)
-      | ConcatBuf (buf1, buf2, len) ->
-	  let len1 = length buf1
-	  in (if start < len1 then
-		write buf1 start (min len1 stop);
-	      if stop > len1 then
-		write buf2 (max 0 (start - len1)) (stop - len1))
-  in
-    write buf 0 (length buf);;
-
-let rec visualize = function
-    ArrayBuf (_, len, _) -> print_int len
-  | SubBuf (sub, start, stop) -> print_string "("; visualize sub; print_string ","; print_int start; print_string ":"; print_int stop; print_string ")"
-  | ConcatBuf (buf1, buf2, len) -> visualize buf1; print_string "+"; visualize buf2;;
-
 let rec flatten buf =
   let buf_len = length buf
   and num_orig = ref 0
@@ -192,3 +166,120 @@ let rec dna_to_string buf =
       ArrayBuf (buf, _, _) ->
 	Buffer.contents buf
     | _ -> raise Buffer_too_long;;
+
+let rec buffer_index_from buf start char =
+  if start >= Buffer.length buf then
+    None
+  else if (Buffer.nth buf start) == char then
+    Some start
+  else
+    buffer_index_from buf (start + 1) char;;
+
+(* val search : dna -> dna -> int option *)
+let search pat dna =
+  let first = base_to_char (nth pat 0)
+  and pat_len = length pat
+  and pat_string = dna_to_string pat
+  in let rec buffer_matches buf start index stop =
+      if (start >= pat_len) || (index >= stop) then
+	 true
+       else if (Buffer.nth buf index) == (String.get pat_string start) then
+	 buffer_matches buf (start + 1) (index + 1) stop
+       else
+	 false
+     and matches dna start index stop =
+      match dna with
+	  ArrayBuf (buf, _, _) -> buffer_matches buf start index stop
+	| SubBuf (sub, sub_start, sub_stop) -> matches sub start (sub_start + index) (sub_start + stop)
+	| ConcatBuf (buf1, buf2, _) ->
+	    let len1 = length buf1
+	    in if stop <= len1 then
+		matches buf1 start index stop
+	      else if index < len1 then
+		(matches buf1 start index len1) && (matches buf2 (start + len1 - index) 0 (stop - len1))
+	      else
+		matches buf2 (start - len1) index (stop - len1)
+     and search dna start stop =
+      if start >= stop then
+	None
+      else
+	match dna with
+	    ArrayBuf (arr, _, _) ->
+	      (match buffer_index_from arr start first with
+		   Some index ->
+		     if (index < stop) && (matches dna 0 index stop) then
+		       Some index
+		     else
+		       search dna (index + 1) stop
+		 | None -> None)
+	  | SubBuf (sub, sub_start, sub_stop) ->
+	      search sub (sub_start + start) (sub_start + stop)
+	  | ConcatBuf (buf1, buf2, len) ->
+	      let len1 = length buf1
+	      in if start < len1 then
+		  match search buf1 start (min len1 stop) with
+		      Some index ->
+			if matches dna 0 index stop then
+			  Some index
+			else
+			  search dna (index + 1) stop
+		    | None ->
+			(match search buf2 (start - len1) (stop - len1) with
+			     Some index -> Some (index + len1)
+			   | None -> None)
+		else
+		  (match search buf2 (start - len1) (stop - len1) with
+		       Some index -> Some (index + len1)
+		     | None -> None)
+  in
+    search dna 0 (length dna);;
+
+assert ((search (create "IFI" false) (create "PIPFIFIFI" false)) = (Some 4));;
+assert ((search (create "IFI" false) (concat (create "PIPFI" false) (create "FIF" false))) = (Some 4));;
+assert ((search (create "IFI" false) (concat (create "PIPI" false) (create "PIFIF" false))) = (Some 5));;
+
+(* val read_dna : in_channel -> dna *)
+let read_dna file =
+  create (input_line file) true;;
+
+(* val write_dna : dna -> out_channel -> unit *)
+let write_dna buf file =
+  let rec write buf start stop =
+    match buf with
+	ArrayBuf (buf, _, _) ->
+	  output_string file (Buffer.sub buf start (stop - start))
+      | SubBuf (sub, sub_start, _) ->
+	  write sub (sub_start + start) (sub_start + stop)
+      | ConcatBuf (buf1, buf2, len) ->
+	  let len1 = length buf1
+	  in (if start < len1 then
+		write buf1 start (min len1 stop);
+	      if stop > len1 then
+		write buf2 (max 0 (start - len1)) (stop - len1))
+  in
+    write buf 0 (length buf);;
+
+let rec visualize = function
+    ArrayBuf (_, len, _) -> print_int len
+  | SubBuf (sub, start, stop) -> print_string "("; visualize sub; print_string ","; print_int start; print_string ":"; print_int stop; print_string ")"
+  | ConcatBuf (buf1, buf2, len) -> visualize buf1; print_string "+"; visualize buf2;;
+
+let history_info buf =
+  let rec history buf start stop =
+    match buf with
+	ArrayBuf (_, _, false) -> []
+      | ArrayBuf (_, _, true) -> [(start, stop)]
+      | SubBuf (sub, sub_start, sub_stop) ->
+	  history sub (sub_start + start) (sub_start + stop)
+      | ConcatBuf (buf1, buf2, len) ->
+	  let len1 = length buf1
+	  in (if start < len1 then
+		history buf1 start (min len1 stop)
+	      else
+		[]) @
+	       (if stop > len1 then
+		  history buf2 (max 0 (start - len1)) (stop - len1)
+		else
+		  [])
+  in
+    history buf 0 (length buf);;

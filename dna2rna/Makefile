@@ -8,7 +8,7 @@ SRCFILES = $(shell echo *.ml *.mli *.mll *.mly) Makefile Makefile.ocaml
 DISTFILES = $(DOCFILES) $(OTHERFILES) $(SRCFILES)
 DISTVERSIONFILES =
 MODULES =  dnabuf rna dna2rna 
-LIBRARIES =
+LIBRARIES = nums
 DISTVERSION = $(shell cat VERSION)
 
 LIBDIRS = 
