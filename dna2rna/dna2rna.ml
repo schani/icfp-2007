@@ -279,6 +279,7 @@ let rec execute dna rna i =
 	(* print_string "rna: "; write_dna rna stdout; print_newline (); *)
 	let (dna, rna, tpl) = get_template dna rna []
 	in print_string "template: "; print_template tpl; print_newline ();
+	  (* print_string "concat same: "; print_int !num_concat_same; print_newline (); *)
 	  (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
 	  if (!i mod 100000) = 99999 then
 	    (let filename = sprintf "/void/endo/endo.%d.rna2" (!i / 100000)
