@@ -7,21 +7,41 @@ open Printf
 open Rna
 open Parseintern
 
+
+type meta_instr = {
+  mi_instr : rna_instr;
+  mi_count : int;
+}
+
 type gui = {
   mainWindow : GWindow.window;
   visual : Gdk.visual;
   mutable bitmapSelectorButtons : GButton.toggle_button array;
   mutable rna_state : rna_state;
-  instructions : rna_instr array;
+  instructions : meta_instr array;
   mutable currentPos : int;
   mutable currentBitmap : int;
   drawing : GDraw.drawable;
   update_status_fun : gui -> unit;
+  mutable breakPoints : rna_instr list;
 }
 
 let usage () =
   fprintf stderr "usage not yet written, sorry";
   exit 1
+
+let meta_instrs_from_rna_instrs = function
+    [] -> []
+  | x :: xs ->
+      let rec work result cur = function
+	  [] -> cur :: result
+	| x :: xs ->
+	    if cur.mi_instr = x then
+	      work result { cur with mi_count = cur.mi_count + 1 } xs
+	    else
+	      work (cur :: result) { mi_instr = x; mi_count = 1 } xs
+      in
+	List.rev (work [] { mi_instr = x; mi_count = 1 } xs)
 
 let displayBitmap gui bitmap darea =
   let image = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
@@ -70,21 +90,35 @@ let redraw_gui gui _ =
   update_gui gui ();
   false
 
-let step gui i () =
+let step ?(break=false) gui i () =
   let rec step_intern = function
       0 -> ()
-    | i when gui.currentPos < Array.length gui.instructions -> 
-	apply_instr gui.rna_state
-	  gui.instructions.(gui.currentPos);
-	gui.currentPos <- gui.currentPos + 1;
-	step_intern (i - 1)
+    | i when break && 
+	  (List.memq gui.instructions.(gui.currentPos).mi_instr
+	      gui.breakPoints) ->
+	()
+    | i when gui.currentPos < Array.length gui.instructions ->
+	let inst = gui.instructions.(gui.currentPos)
+	in
+	  for j = 1 to inst.mi_count
+	  do
+	    apply_instr gui.rna_state inst.mi_instr
+	  done;
+	  gui.currentPos <- gui.currentPos + 1;
+	  step_intern (i - 1)
     | _ -> ()
   in
     step_intern i;
     update_gui gui ()
 
-let setupGui rna_instrs =
-  let w = GWindow.window ~title:"grna2fuun"
+let breakpointChanged (combo : #GEdit.combo_box) gui () =
+  gui.breakPoints <-
+    [| []; [RI_Compose; RI_AddBitmap]; [RI_Compose]; [RI_AddBitmap];
+       [RI_Clip]; [RI_Fill] |].(combo#active)
+
+let setupGui (rna_instrs : rna_instr list) =
+  let meta_instrs = Array.of_list (meta_instrs_from_rna_instrs rna_instrs)
+  in let w = GWindow.window ~title:"grna2fuun"
     ~show:true ~width:1000 ~height:750 ()
     (* rest | cmdlist *)
   in let hb1 = GPack.hbox ~border_width:4 ~spacing:4 ~packing:w#add ()
@@ -101,8 +135,8 @@ let setupGui rna_instrs =
     ~packing:vbMain#add ()
   in let instrListBar = GRange.scrollbar `VERTICAL
     ~packing:(hb1#pack ~from:`END) ()
-  in let instrList = GList.clist ~titles:["Number";"Command"] ~shadow_type:`OUT
-    ~vadjustment:instrListBar#adjustment
+  in let instrList = GList.clist ~titles:["Number";"Count";"Command"]
+    ~shadow_type:`OUT ~vadjustment:instrListBar#adjustment
     ~packing:(hb1#pack ~expand:true) ()
   in let reset = GButton.button ~label:"reset" ~packing:hbCmd#pack ()
   in let redraw = GButton.button ~label:"redraw" ~packing:hbCmd#pack ()
@@ -111,6 +145,11 @@ let setupGui rna_instrs =
   in let plus100 = GButton.button ~label:"+100" ~packing:hbCmd#pack ()
   in let plus1000 = GButton.button ~label:"+1000" ~packing:hbCmd#pack ()
   in let plus10000 = GButton.button ~label:"+10000" ~packing:hbCmd#pack ()
+  in let runto = GButton.button ~label:"Run to:" ~packing:hbCmd#pack ()
+  in let (breakCombo, (_, breakComboColumn)) =
+    GEdit.combo_box_text ~packing:hbCmd#pack 
+      ~strings:["End" ; "Compose/AddBitmap" ; "Compose" ; "AddBitmap" ;
+		"Clip" ; "Fill";] ()
   in let _ = GMisc.label ~text:"POS:" ~packing:hbStatus#pack ()
   in let posLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let _ = GMisc.label ~text:"MARK:" ~packing:hbStatus#pack ()
@@ -128,26 +167,26 @@ let setupGui rna_instrs =
     and markx, marky = rnaState.mark
     in
       instrList#select gui.currentPos 1;
+      instrList#moveto (abs (gui.currentPos - 5)) 1;
       posLabel#set_text (sprintf "(%i,%i)" posix posiy);
       markLabel#set_text (sprintf "(%i,%i)" markx marky);
       dirLabel#set_text (string_of_dir rnaState.dir);
       bitmapsLabel#set_text (string_of_int (List.length rnaState.bitmaps));
       statelistlenlabel#set_text (sprintf "RNA: %i/%i"
-				     gui.currentPos (Array.length rna_instrs))
+				     gui.currentPos (Array.length meta_instrs))
   in let gui = { mainWindow = w;
 		 visual = w#misc#visual;
 		 rna_state = createRNAState ();
-		 instructions = rna_instrs;
+		 instructions = meta_instrs;
 		 currentPos = 0;
 		 currentBitmap = 0;
 		 drawing = drawing;
+		 breakPoints = [];
 		 bitmapSelectorButtons = [| |];
 		 update_status_fun = update_status;}
   in let select_bitmap nr () =
     if nr != gui.currentBitmap &&
       gui.bitmapSelectorButtons.(nr)#active then begin
-      fprintf stderr "button %i clicked\n" nr;
-      flush stderr;
       gui.currentBitmap <- nr;
       adjustImageSelectorButtons gui;
       update_gui gui ()
@@ -173,11 +212,15 @@ let setupGui rna_instrs =
       step gui newPos ();
       update_gui gui ()
     end
+  in let mi_convert i e =
+    ignore (instrList#append [string_of_int i;
+			      string_of_int e.mi_count;
+			      string_of_instr e.mi_instr])
   in
+    breakCombo#set_active 0;
+    ignore (breakCombo#connect#changed (breakpointChanged breakCombo gui));
     gui.bitmapSelectorButtons <- createBitmapSelectorButtons ();
-    Array.iteri (fun i e -> ignore (instrList#append [string_of_int i;
-						      string_of_instr e]))
-      rna_instrs;
+    Array.iteri mi_convert meta_instrs;
     ignore (reset#connect#clicked ~callback:reset_gui);
     ignore (redraw#connect#clicked ~callback:(update_gui gui));
     ignore (plus1#connect#clicked ~callback:(step gui 1));
@@ -185,6 +228,7 @@ let setupGui rna_instrs =
     ignore (plus100#connect#clicked ~callback:(step gui 100));
     ignore (plus1000#connect#clicked ~callback:(step gui 1000));
     ignore (plus10000#connect#clicked ~callback:(step gui 10000));
+    ignore (runto#connect#clicked ~callback:(step ~break:true gui max_int));
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));
     ignore (w#connect#destroy ~callback:GMain.Main.quit);
     ignore (instrList#connect#select_row
@@ -210,7 +254,7 @@ if Array.length Sys.argv != 2 then
 	  fprintf stderr "parse error: %s\n" (Printexc.to_string x);
 	  exit 2
   in
-    setupGui (Array.of_list statelist);
+    setupGui statelist;
     (*
       Gdk.Rgb.init ();
       GtkBase.Widget.set_default_visual (Gdk.Rgb.get_visual ());
