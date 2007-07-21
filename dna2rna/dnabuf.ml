@@ -235,12 +235,16 @@ let search pat dna =
 		     | None -> None)
   in
     search dna 0 (length dna);;
+    
 
 assert ((search (create "IFI" false) (create "PIPFIFIFI" false)) = (Some 4));;
 assert ((search (create "IFI" false) (create "PIPFIFI" false)) = (Some 4));;
 assert ((search (create "IFI" false) (concat (create "PIPFI" false) (create "FIF" false))) = (Some 4));;
 assert ((search (create "IFI" false) (concat (create "PIPI" false) (create "PIFIF" false))) = (Some 5));;
 assert ((search (create "IFI" false) (concat (subbuf (create "PIPICP" false) 1 4) (subbuf (create "PCFIPIFIP" false) 2 6))) = (Some 2));;
+assert ((search (create "I" false)   (concat (create "P" false) (create "P" false)))= (Some 0));;
+(* assert ((search (create "I" false)   (concat (create "P" false) (create "P" false)))= (Some 0));; *)
+(* assert ((search (create "I" false)   (concat (subbuf (create "P" false) 0 1) (create "P" false)))= (Some 0));; *)
 
 (* val read_dna : in_channel -> dna *)
 let read_dna file =
