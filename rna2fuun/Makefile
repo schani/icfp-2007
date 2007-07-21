@@ -1,5 +1,5 @@
 DISTNAME = rna2fuun
-BINFILES = rna2fuun grna2fuun
+BINFILES = rna2fuun grna2fuun colortest
 SBINFILES =
 LIBFILES =
 DOCFILES = COPYING LICENSE CHANGELOG VERSION 

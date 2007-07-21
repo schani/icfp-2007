@@ -27,9 +27,9 @@ let displayBitmap gui bitmap darea =
   let image = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
     ~width:600 ~height:600
   in
-    for x = 0 to 599 do
-      for y = 0 to 599 do
-	let ((r,g,b), a) = bitmap.(599 - y).(x)
+    for y = 0 to 199 do
+      for x = 0 to 599 do
+	let ((r,g,b), a) = bitmap.(y).(x)
 	in
 	  Gdk.Image.put_pixel image ~x:x ~y:y
 	    ~pixel:(Gdk.Truecolor.color_creator gui.visual
@@ -37,16 +37,6 @@ let displayBitmap gui bitmap darea =
       done
     done;
     gui.drawing#put_image image ~x:0 ~y:0
-
-let displayBitmapManually gui bm =
-  for y = 0 to 599 do
-      for x = 0 to 599 do
-	let ((r,g,b), a) = bm.(599 - y).(x)
-	in
-	  gui.drawing#set_foreground (`RGB (r*256, g*256, b*256));
-	  gui.drawing#point ~x:x ~y:y
-      done
-    done
 
 let displayDreck gui =
   gui.drawing#set_foreground (`NAME "red");

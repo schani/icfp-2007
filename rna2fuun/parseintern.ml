@@ -7,16 +7,16 @@ open Rna
 
 let parse_line str =
   match str.[0] with
-    | 'K' -> RI_Color (RGB black)
-    | 'R' -> RI_Color (RGB  red)
-    | 'G' -> RI_Color (RGB green)
-    | 'Y' -> RI_Color (RGB yellow)
-    | 'B' -> RI_Color (RGB blue)
-    | 'M' -> RI_Color (RGB magenta)
-    | 'C' -> RI_Color (RGB cyan)
-    | 'W' -> RI_Color (RGB white)
-    | 'T' -> RI_Color (Alpha transparent)
-    | 'O' -> RI_Color (Alpha opaque)
+    | 'K' -> RI_RGB black
+    | 'R' -> RI_RGB red
+    | 'G' -> RI_RGB green
+    | 'Y' -> RI_RGB yellow
+    | 'B' -> RI_RGB blue
+    | 'M' -> RI_RGB magenta
+    | 'C' -> RI_RGB cyan
+    | 'W' -> RI_RGB white
+    | 'T' -> RI_Alpha transparent
+    | 'O' -> RI_Alpha opaque
     | 'e' -> RI_ClearBucket
     | '^' -> RI_Move
     | '<' -> RI_RotateCounterClockwise

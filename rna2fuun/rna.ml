@@ -14,7 +14,15 @@ type pixel = rgb * transparency
 type bitmap = pixel array array
 type color = RGB of rgb
 	     | Alpha of transparency
-type bucket = color list
+(* type bucket = color list *)
+
+type fastbucket = {
+  mutable fb_pixel : pixel;
+  mutable fb_rgb_count : int;
+  mutable fb_transparency_count : int;
+  mutable fb_getPixel : ((int * int * int) * int) lazy_t;
+}
+
 type dir = N | E | S | W
 
 let string_of_dir = function
@@ -24,7 +32,8 @@ let string_of_dir = function
   | W -> "W"
 
 type rna_instr =
-    | RI_Color of color
+    | RI_RGB of rgb
+    | RI_Alpha of transparency
     | RI_ClearBucket
     | RI_Move
     | RI_RotateCounterClockwise
@@ -57,12 +66,9 @@ let string_of_rgb = function
   | (255, 255, 255) -> "white"
   | r,g,b -> sprintf "RGB:(%i,%i,%i)" r g b
 
-let string_of_color = function
-  | RGB rgb -> string_of_rgb rgb
-  | Alpha a -> sprintf "Alpha:%i" a
-
 let string_of_instr = function
-  | RI_Color c -> string_of_color c
+  | RI_RGB c -> string_of_rgb c
+  | RI_Alpha a -> "Alpha:"^(string_of_int a)
   | RI_ClearBucket -> "ClearBucket"
   | RI_RotateClockwise -> "RotClockWise"
   | RI_RotateCounterClockwise -> "RotCounterCW"
@@ -92,36 +98,79 @@ let createDemoBitmap () =
 
 let createTransparentBitmap () =
   let transparentPixel = ((black, transparent) : pixel)
+  in let bm = ((Array.create 600 (Array.create 0 transparentPixel)) : bitmap)
   in
-    ((Array.create 600 (Array.create 600 transparentPixel)) : bitmap)
+    for y = 0 to 599 do
+      bm.(y) <- Array.create 600 transparentPixel;
+    done;
+    bm
 
 type rna_state = {
-  mutable bucket : bucket;
+(*  mutable bucket : bucket; *)
+  mutable fastbucket : fastbucket;
   mutable position : pos;
   mutable mark : pos;
   mutable dir : dir;
   mutable bitmaps : bitmap list;
 }
 
-let createRNAState () =
-  { bucket = []; position = 0, 0; mark = 0,0; dir = E; bitmaps = [createTransparentBitmap ()] }
+let createEmptyFastBucket () =
+  {
+    fb_pixel = (0, 0, 0), 0;
+    fb_rgb_count = 0;
+    fb_transparency_count = 0;
+    fb_getPixel = lazy ((0,0,0),255)
+  }
 
-let addColor st c =
-  st.bucket <- c :: st.bucket
+let pixel_from_fastbucket fb =
+  Lazy.force fb.fb_getPixel
+
+let really_pixel_from_fastbucket fb =
+  let (r,g,b),a = fb.fb_pixel
+  in let rc = if fb.fb_rgb_count > 0 then r / fb.fb_rgb_count else 0
+  in let gc = if fb.fb_rgb_count > 0 then g / fb.fb_rgb_count else 0
+  in let bc = if fb.fb_rgb_count > 0 then b / fb.fb_rgb_count else 0
+  in let ac = if fb.fb_transparency_count > 0 then
+    a / fb.fb_transparency_count else 255
+  in
+      (rc * ac / 255, gc * ac / 255, bc * ac / 255), ac
+
+let colorAdd fb (rd,gd,bd) =
+  let (r,g,b),a = fb.fb_pixel
+  in let result = { fb with
+    fb_pixel = ((r+rd, g+gd, b+bd), a);
+    fb_rgb_count = fb.fb_rgb_count + 1
+  }
+  in
+    result.fb_getPixel <- lazy (really_pixel_from_fastbucket result);
+    result
+
+let alphaAdd fb ad =
+  let (r,g,b),a = fb.fb_pixel
+  in let result = { fb with
+    fb_pixel = ((r, g, b), a+ad);
+    fb_transparency_count= fb.fb_transparency_count + 1
+  }
+  in
+    result.fb_getPixel <- lazy (really_pixel_from_fastbucket result);
+    result
+
+let dumpPixel p =
+  let (r,g,b),a = p
+  in
+    fprintf stdout "Bucket(R=%i, G=%i, B=%i, A=%i)\n" r g b a;
+    flush stdout
+
+let createRNAState () =
+  { fastbucket = createEmptyFastBucket ();
+    position = 0, 0;
+    mark = 0,0;
+    dir = E;
+    bitmaps = [createTransparentBitmap ()]
+  }
 
 let currentPixel st =
-  let average filter_fun default = function
-      [] -> default
-    | l -> (List.fold_left (+) 0 (List.map filter_fun l)) / (List.length l)
-  in let rc = average (function RGB (r,g,b) -> r | Alpha _ -> 0) 0 st.bucket
-  and gc = average (function RGB (r,g,b) -> g | Alpha _ -> 0) 0 st.bucket
-  and bc = average (function RGB (r,g,b) -> b | Alpha _ -> 0) 0 st.bucket
-  and ac = average (function RGB _ -> 0 | Alpha a -> a) 255 st.bucket
-  in
-       ((int_of_float (floor((float_of_int rc) *. (float_of_int ac) /. 255.0)),
-	int_of_float (floor((float_of_int gc) *. (float_of_int ac) /. 255.0)),
-	int_of_float (floor((float_of_int bc) *. (float_of_int ac) /. 255.0))),
-	ac : pixel)
+  pixel_from_fastbucket st.fastbucket
 
 let move ((x,y) : pos) = function
     N -> ((x, (y - 1 + 600) mod 600) : pos)
@@ -153,7 +202,7 @@ let setPixel st ((x,y) : pos) =
 
 let line st ((x0, y0) : pos) ((x1, y1) : pos) =
   let deltax = x1 - x0
-  and deltay = x1 - y0
+  and deltay = y1 - y0
   in let d = max (abs deltax) (abs deltay)
   and c = if (deltax * deltay <= 0) then 1 else 0
   in let x = ref (x0 * d + (int_of_float
@@ -162,11 +211,13 @@ let line st ((x0, y0) : pos) ((x1, y1) : pos) =
 			    (floor ((float_of_int (d - c)) /. 2.0))))
   in
     for i = 1 to d do
-      setPixel st
+      let nowx, nowy =
 	((int_of_float (floor ((float_of_int !x) /. (float_of_int d)))),
-	(int_of_float (floor ((float_of_int !y) /. (float_of_int d)))));
-      x := !x + deltax;
-      y := !y + deltay;
+	(int_of_float (floor ((float_of_int !y) /. (float_of_int d)))))
+      in
+	setPixel st (nowx, nowy);
+	x := !x + deltax;
+	y := !y + deltay;
     done;
     setPixel st (x1, y1)
 
@@ -180,7 +231,7 @@ let rec fill st (initial : pixel) = function
 	    ((x - 1, y) :: (x + 1, y) :: (x, y - 1) :: (x, y + 1) :: ps)
 	else
 	  fill st initial ps
-(*
+
 let rec orig_fill st (p : pos) (initial : pixel) =
   let x,y = p
   in
@@ -191,7 +242,7 @@ let rec orig_fill st (p : pos) (initial : pixel) =
 	if y > 0 then orig_fill st (x, y - 1) initial;
 	if y < 599 then orig_fill st (x, y + 1) initial;
       end
-*)
+
 let tryfill st =
   let neu = currentPixel st
   and old = getPixel st st.position
@@ -253,8 +304,9 @@ let clip st =
 let apply_instr st instr =
   try
     match instr with
-      | RI_Color c -> addColor st c
-      | RI_ClearBucket -> st.bucket <- []
+      | RI_RGB c -> st.fastbucket <- colorAdd st.fastbucket c
+      | RI_Alpha a -> st.fastbucket <- alphaAdd st.fastbucket a
+      | RI_ClearBucket -> st.fastbucket <- createEmptyFastBucket ()
       | RI_Move -> st.position <- move st.position st.dir
       | RI_RotateCounterClockwise -> st.dir <- turnCounterClockwise st.dir
       | RI_RotateClockwise -> st.dir <- turnClockwise st.dir
