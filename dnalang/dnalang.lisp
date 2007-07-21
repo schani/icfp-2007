@@ -1,13 +1,13 @@
 (load "utils.lisp")
 (load "let-match.lisp")
 
-(defun asnat (n)
+(defun asnat (n &optional (terminator t))
   (cond ((zerop n)
-	 "P")
+	 (if terminator "P" ""))
 	((evenp n)
-	 (string-concat "I" (asnat (ash n -1))))
+	 (string-concat "I" (asnat (ash n -1) terminator)))
 	(t
-	 (string-concat "C" (asnat (ash n -1))))))
+	 (string-concat "C" (asnat (ash n -1) terminator)))))
 
 (defun quote-dna (str)
   (apply #'string-concat
@@ -86,3 +86,8 @@
     (if (= new-len prefix-len)
 	(string-concat prefix prefix)
 	(global-dna-replace src dst new-len))))
+
+(defun replace-constant (prefix const)
+  (let ((str (asnat const nil)))
+    (compile-rule `((group (? ,prefix)) ,(make-string (length str) :initial-element #\I))
+		  `((0 _ 0) ,str))))
