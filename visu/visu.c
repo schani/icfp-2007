@@ -83,9 +83,8 @@ void	recalc_col(struct _bucket *b)
 	
 	unsigned col = COL(rc*ac/255, gc*ac/255, bc*ac/255, ac);
 
-	b->col = opt_blackwhite ? (col ? 0xFFFFFF : 0x0) : col;
+	b->col = col;
 }
-
 
 static inline 
 void	do_move(unsigned dir, struct _pos *pos)
@@ -404,7 +403,16 @@ static	unsigned ui_reload = 0;
 	printf("%s: " f "\n", v, a);
 
 
-
+void	black_white(void *data)
+{
+	unsigned *ptr = (unsigned *)data;
+	unsigned cnt = 600*600;
+	
+	while (cnt--) {
+	    *ptr = *ptr ? 0xFFFFFF : 0x0;
+	    ptr++;
+	}
+}
 
 void	visualize(struct _bitmap *bm)
 {
@@ -416,6 +424,10 @@ void	visualize(struct _bitmap *bm)
 	SDL_LockSurface(screen);
 	memcpy(raw, (void *)bm->data[0],
 		sizeof(struct _bitmap));
+
+	if (opt_blackwhite)
+	    black_white(raw);
+
 	SDL_UnlockSurface(screen);
 #else
 	if (!(index_cur % 1000))
@@ -564,7 +576,8 @@ int	user_input(void)
 
 
 	case SDL_QUIT :
-	    quit = 1;
+	/*  printf("quit received ....\n");
+	    quit = 1; */
 	    break;
 	}
 	return quit;
@@ -783,8 +796,8 @@ skip_sdl:
 		}
 	    }
 	    if (opt_novisual && ui_stop)
-		    break;
-	    else if ((user_input() & UI_QUIT))
+		break;
+	    else if (user_input())
 		exit(1);
 	};
 
