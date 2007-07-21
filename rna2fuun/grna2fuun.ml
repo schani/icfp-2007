@@ -14,10 +14,15 @@ type meta_instr = {
   mi_rnaline : int;
 }
 
+type bm_mode =
+    GM_BITMAP | GM_SRC | GM_DST
+
 type gui = {
   mainWindow : GWindow.window;
   visual : Gdk.visual;
   mutable bitmapSelectorButtons : GButton.toggle_button array;
+  mutable src_toggler : GButton.toggle_button;
+  mutable dest_toggler : GButton.toggle_button;
   mutable rna_state : rna_state;
   instructions : meta_instr array;
   mutable currentPos : int;
@@ -25,8 +30,9 @@ type gui = {
   drawing : GDraw.drawable;
   update_status_fun : gui -> unit;
   mutable breakPoints : rna_instr list;
-  src_pixbuf : GdkPixbuf.pixbuf option;
-  dest_pixbuf : GdkPixbuf.pixbuf option;
+  mutable src_pixbuf : GdkPixbuf.pixbuf option;
+  mutable dest_pixbuf : GdkPixbuf.pixbuf option;
+  mutable bmMode : bm_mode;
 }
 
 let usage () =
@@ -62,31 +68,61 @@ let displayBitmap gui bitmap darea =
     done;
     gui.drawing#put_image image ~x:0 ~y:0
 
-let displayDreck gui =
-  gui.drawing#set_foreground (`NAME "red");
-  gui.drawing#rectangle ~filled:true ~x:100 ~y:100 ~width:50 ~height:50 ()
+let displayPixBuf gui = function
+  | Some pixbuf ->
+      gui.drawing#put_pixbuf ~x:0 ~y:0 pixbuf
+  | None ->
+      fprintf stderr "failed to draw pixbuf :(\n";
+      flush stderr
 
 let adjustImageSelectorButtons gui =
   let bitmap_nr = List.length gui.rna_state.bitmaps
   in
+    begin
+      match gui.bmMode with
+	  GM_BITMAP ->
+	    if gui.src_toggler#active then
+	      gui.src_toggler#set_active false;
+	    if gui.dest_toggler#active then
+	      gui.dest_toggler#set_active false
+	| GM_SRC ->
+	    if not gui.src_toggler#active then
+	      gui.src_toggler#set_active true;
+	    if gui.dest_toggler#active then
+	      gui.dest_toggler#set_active false
+	| GM_DST ->
+	    if gui.src_toggler#active then
+	      gui.src_toggler#set_active false;
+	    if not gui.dest_toggler#active then
+	      gui.dest_toggler#set_active true
+    end;
     if gui.currentBitmap >= bitmap_nr then
       gui.currentBitmap <- bitmap_nr - 1;
     for i = 0 to 9 do
       let b = gui.bitmapSelectorButtons.(i)
       in
 	b#misc#set_sensitive (if i < bitmap_nr then true else false);
-	if i != gui.currentBitmap && b#active then
+	if gui.bmMode != GM_BITMAP || (i != gui.currentBitmap && b#active) then
 	  b#set_active false
 	else
-	  if i == gui.currentBitmap && (not b#active) then
+	  if gui.bmMode == GM_BITMAP &&
+	    (i == gui.currentBitmap && (not b#active)) then
 	    b#set_active true
     done
 
 let update_gui gui () =
 (*  displayDreck gui *)
   adjustImageSelectorButtons gui;
-  displayBitmap gui (List.nth gui.rna_state.bitmaps
-			gui.currentBitmap) gui.drawing;
+  begin
+    match gui.bmMode with
+      | GM_BITMAP ->
+	  displayBitmap gui (List.nth gui.rna_state.bitmaps
+				gui.currentBitmap) gui.drawing;
+      | GM_SRC ->
+	  displayPixBuf gui gui.src_pixbuf
+      | GM_DST ->
+	  displayPixBuf gui gui.dest_pixbuf
+  end;
   gui.update_status_fun gui
     (*  displayBitmapManually gui (List.hd gui.rna_state.bitmaps) *)
 
@@ -197,10 +233,17 @@ let setupGui (rna_instrs : rna_instr list) =
 		 drawing = drawing;
 		 breakPoints = [];
 		 bitmapSelectorButtons = [| |];
-		 update_status_fun = update_status;}
+		 src_toggler = GButton.toggle_button ();
+		 dest_toggler = GButton.toggle_button ();
+		 update_status_fun = update_status;
+		 src_pixbuf = None;
+		 dest_pixbuf = None;
+		 bmMode = GM_BITMAP;
+  }
   in let select_bitmap nr () =
-    if nr != gui.currentBitmap &&
-      gui.bitmapSelectorButtons.(nr)#active then begin
+    if (nr != gui.currentBitmap &&
+	gui.bitmapSelectorButtons.(nr)#active) then begin
+      gui.bmMode <- GM_BITMAP;
       gui.currentBitmap <- nr;
       adjustImageSelectorButtons gui;
       update_gui gui ()
@@ -209,7 +252,7 @@ let setupGui (rna_instrs : rna_instr list) =
     let a = Array.create 10 (GButton.toggle_button ())
     in
       for i = 0 to 9 do
-	let b = GButton.toggle_button ~label:("bitm"^(string_of_int i))
+	let b = GButton.toggle_button ~label:("BM"^(string_of_int i))
 	  ~packing:hbImgSelButs#pack ()
 	in
 	  ignore (b#connect#toggled ~callback:(select_bitmap i));
@@ -231,23 +274,42 @@ let setupGui (rna_instrs : rna_instr list) =
 			      string_of_int e.mi_count;
 			      string_of_instr e.mi_instr;
                               string_of_int e.mi_rnaline])
+  and srcdest_cb who what () =
+    if who#active then
+      begin
+	if gui.bmMode != what then begin
+	  gui.currentBitmap <- -1;
+	  gui.bmMode <- what;
+	  adjustImageSelectorButtons gui;
+	  update_gui gui ()
+	end
+      end
   in
        begin
 	 try
-	   gui.src_pixbuf = GdkPixbuf.from_file "/void/source.png"; 
+	   gui.src_pixbuf <- Some (GdkPixbuf.from_file "source.png")
 	 with
 	     _ ->
-	       fprintf stderr "failed to load source.png";
+	       fprintf stderr "failed to load source.png\n"; flush stderr
        end;
     begin
       try
-	gui.src_pixbuf = GdkPixbuf.from_file "/void/target.png"
+	gui.dest_pixbuf <- Some (GdkPixbuf.from_file "target.png")
       with
-	  _ -> ()
+	  _ ->
+	    fprintf stderr "failed to load target.png\n"; flush stderr
     end;
     breakCombo#set_active 0;
     ignore (breakCombo#connect#changed (breakpointChanged breakCombo gui));
     gui.bitmapSelectorButtons <- createBitmapSelectorButtons ();
+    gui.src_toggler <-
+      GButton.toggle_button ~label:"SRC" ~packing:hbImgSelButs#pack ();
+    ignore (gui.src_toggler#connect#clicked
+	       ~callback:(srcdest_cb gui.src_toggler GM_SRC));
+    gui.dest_toggler <-
+      GButton.toggle_button ~label:"DST" ~packing:hbImgSelButs#pack ();
+    ignore (gui.dest_toggler#connect#clicked
+	       ~callback:(srcdest_cb gui.dest_toggler GM_DST));
     Array.iteri mi_convert meta_instrs;
     ignore (reset#connect#clicked ~callback:reset_gui);
     ignore (redraw#connect#clicked ~callback:(update_gui gui));
@@ -262,7 +324,7 @@ let setupGui (rna_instrs : rna_instr list) =
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));
     ignore (w#connect#destroy ~callback:GMain.Main.quit);
     ignore (instrList#connect#select_row
-	       ~callback:(fun ~row ~column ~event -> goto_gui row));
+	       ~callback:(fun ~row ~column ~event -> goto_gui row))
 
 let _ =
   begin
