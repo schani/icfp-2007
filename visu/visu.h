@@ -1,29 +1,6 @@
 
-
-enum {
-	DIR_N = 0,
-	DIR_E,
-	DIR_S,
-	DIR_W
-};
-
-struct _bucket {
-	unsigned R;
-	unsigned G;
-	unsigned B;
-	unsigned N;
-	
-	unsigned A;
-	unsigned M;
-	
-	unsigned col;
-};
-
-struct _pos {
-	unsigned X;
-	unsigned Y;
-};
-
+#define	WIDTH	600
+#define	HEIGHT	600
 
 #define	MAXLINE	4096
 
@@ -56,7 +33,44 @@ struct _pos {
 #define	AVAL(c)		(((c) >> 24) & 0xFF)
 
 
+enum {
+	DIR_N = 0,
+	DIR_E,
+	DIR_S,
+	DIR_W
+};
+
+struct _bucket {
+	unsigned R;
+	unsigned G;
+	unsigned B;
+	unsigned N;
+	
+	unsigned A;
+	unsigned M;
+	
+	unsigned col;
+	unsigned dirty;
+};
+
+struct _pos {
+	unsigned X;
+	unsigned Y;
+};
+
 
 struct _bitmap {
-	unsigned data[600][600];
+	unsigned data[WIDTH][HEIGHT];
+};
+
+struct _state {
+	struct _bucket bucket;
+
+	struct _pos pos;
+	struct _pos mark;
+
+	unsigned dir;
+
+	struct _bitmap bitmaps[10];
+	unsigned layer;
 };

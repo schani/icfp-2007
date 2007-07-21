@@ -16,7 +16,7 @@
 
 
 
-#define VERSION "V0.2"
+#define VERSION "V0.3"
 
 
 static	char *cmd_name;
@@ -28,25 +28,26 @@ static Uint8 *raw;
 #endif
 
 
-
-
-static	struct _bucket bucket;
-
-static	unsigned width = 600;
-static	unsigned height = 600;
-
-static	struct _pos pos = {0, 0};
-static	struct _pos mark = {0, 0};
-
-static	unsigned dir = DIR_E;
-
-
-static	struct _bitmap bitmaps[10];
-static	unsigned layer = 0;
+static	struct _state master;	
 
 static	struct _bitmap risk;
 
 
+
+void	init_state(struct _state *state)
+{
+	memset(state, 0, sizeof(struct _state));
+	
+	state->bucket.R = 0; state->bucket.G = 0;
+	state->bucket.B = 0; state->bucket.N = 0;
+	state->bucket.A = 0; state->bucket.M = 0;
+	state->bucket.col = 0;
+	
+	state->pos.X = 0; state->pos.Y = 0;
+	state->mark.X = 0; state->mark.Y = 0;
+	state->dir = DIR_E;
+	state->layer = 0;
+}
 
 
 static inline
@@ -78,35 +79,43 @@ void	do_move(unsigned dir, struct _pos *pos)
 }
 
 static inline 
-unsigned get_pixel(unsigned x, unsigned y)
+unsigned get_pixel(struct _state *s, unsigned x, unsigned y)
 {
-	return bitmaps[layer].data[y][x];
+	return s->bitmaps[s->layer].data[y][x];
 }
 
 static inline 
-void	set_pixel(unsigned x, unsigned y, unsigned col)
+void	set_pixel(struct _state *s, unsigned x, unsigned y, unsigned col)
 {
-	bitmaps[layer].data[y][x] = col;
+	s->bitmaps[s->layer].data[y][x] = col;
 }
 
 static inline 
-void	draw_line(unsigned x0, unsigned y0,
-		  unsigned x1, unsigned y1, unsigned col)
+void	draw_line(struct _state *s)
 {
+	unsigned x0 = s->mark.X;
+	unsigned y0 = s->mark.Y;
+	unsigned x1 = s->pos.X;
+	unsigned y1 = s->pos.Y;
+	
 	signed dx = x1 - x0;
 	signed dy = y1 - y0;
 	unsigned d = MAX(ABS(dx), ABS(dy));
 	unsigned c = (dx*dy <= 0) ? 1 : 0;
 	unsigned x = x0 * d + ((d - c)/2);
 	unsigned y = y0 * d + ((d - c)/2);
-	unsigned i;
+	unsigned i, col;
 	
+	if (s->bucket.dirty)
+	    recalc_col(&s->bucket);
+	
+	col = s->bucket.col;
 	for (i = 0; i < d; i++) {
-	    set_pixel(x/d, y/d, col);
+	    set_pixel(s, x/d, y/d, col);
 	    x += dx;
 	    y += dy;
 	}
-	set_pixel(x1, y1, col);
+	set_pixel(s, x1, y1, col);
 }
 
 
@@ -114,37 +123,44 @@ static	unsigned _fx, _fy;
 static	unsigned _fi, _fc;
 
 static inline 
-void	_fill(void)
+void	_fill(struct _state *s)
 {
-	unsigned old = get_pixel(_fx, _fy);
+	unsigned old = get_pixel(s, _fx, _fy);
 	
 	if (_fi == old) {
-	    set_pixel(_fx, _fy, _fc);
-	    if (_fx > 0)   { _fx--; _fill(); _fx++; }
-	    if (_fx < 599) { _fx++; _fill(); _fx--; }
-	    if (_fy > 0)   { _fy--; _fill(); _fy++; }
-	    if (_fy < 599) { _fy++; _fill(); _fy--; }
+	    set_pixel(s, _fx, _fy, _fc);
+	    if (_fx > 0)   { _fx--; _fill(s); _fx++; }
+	    if (_fx < 599) { _fx++; _fill(s); _fx--; }
+	    if (_fy > 0)   { _fy--; _fill(s); _fy++; }
+	    if (_fy < 599) { _fy++; _fill(s); _fy--; }
 	}
 }
 
 static inline 
-void	tryfill(unsigned x, unsigned y, unsigned col)
+void	tryfill(struct _state *s)
 {
-	unsigned old = get_pixel(x, y);
+	unsigned x = s->pos.X;
+	unsigned y = s->pos.Y;
+	unsigned old = get_pixel(s, x, y);
+	unsigned col;
+
+	if (s->bucket.dirty)
+	    recalc_col(&s->bucket);
 	
+	col = s->bucket.col;
 	if (col != old) {
 	    _fx = x; _fy = y;
 	    _fi = old; _fc = col;
-	    _fill();
+	    _fill(s);
 	}
 }
 
 static inline 
-void	add_bitmap(void)
+void	add_bitmap(struct _state *s)
 {
-	if (layer < 9) {
-	    layer++;
-	    memset(bitmaps[layer].data[0],
+	if (s->layer < 9) {
+	    s->layer++;
+	    memset(s->bitmaps[s->layer].data[0],
 		0, sizeof(struct _bitmap));
 	}
 }
@@ -173,11 +189,11 @@ unsigned _compose(unsigned c0, unsigned c1)
 
 
 static inline 
-void	do_compose(void)
+void	do_compose(struct _state *s)
 {
-	if (layer > 0) {
-	    unsigned *src = bitmaps[layer--].data[0];
-	    unsigned *dst = bitmaps[layer].data[0];
+	if (s->layer > 0) {
+	    unsigned *src = s->bitmaps[s->layer--].data[0];
+	    unsigned *dst = s->bitmaps[s->layer].data[0];
 	    unsigned cnt = 600*600;
 	    
 	    while (cnt--) {
@@ -207,11 +223,11 @@ unsigned _clip(unsigned c0, unsigned c1)
 }
 
 static inline 
-void	do_clip(void)
+void	do_clip(struct _state *s)
 {
-	if (layer > 0) {
-	    unsigned *src = bitmaps[layer--].data[0];
-	    unsigned *dst = bitmaps[layer].data[0];
+	if (s->layer > 0) {
+	    unsigned *src = s->bitmaps[s->layer--].data[0];
+	    unsigned *dst = s->bitmaps[s->layer].data[0];
 	    unsigned cnt = 600*600;
 	    
 	    while (cnt--) {
@@ -225,45 +241,46 @@ void	do_clip(void)
 }
 
 
-
-static	void build_cmd(char cmd)
+static	void build_cmd(struct _state *s, char cmd)
 {
+	struct _bucket *b = &s->bucket;
+
 	switch(cmd) {
 	case 'K': 					goto color;
-	case 'R': bucket.R++;				goto color;
-	case 'G': bucket.G++;				goto color;
-	case 'B': bucket.B++;				goto color;
-	case 'Y': bucket.R++; bucket.G++;		goto color;
-	case 'M': bucket.R++; bucket.B++;		goto color;
-	case 'C': bucket.G++; bucket.B++;		goto color;
-	case 'W': bucket.R++; bucket.G++; bucket.B++;
+	case 'R': b->R++;				goto color;
+	case 'G': b->G++;				goto color;
+	case 'B': b->B++;				goto color;
+	case 'Y': b->R++; b->G++;			goto color;
+	case 'M': b->R++; b->B++;			goto color;
+	case 'C': b->G++; b->B++;			goto color;
+	case 'W': b->R++; b->G++; b->B++;
 	   color:
-		bucket.N++; recalc_col(&bucket);
+		b->N++; b->dirty = 1;
 		break;
 
-	case 'O': bucket.A++;
-	case 'T': bucket.M++; 
-		recalc_col(&bucket);
+	case 'O': b->A++;
+	case 'T': b->M++; 
+		  b->dirty = 1;
 		break;
 
-	case 'e': bucket.R = bucket.G = bucket.B = 0;
-		  bucket.A = 0; 
-		  bucket.N = bucket.M = 0;
-		recalc_col(&bucket);
+	case 'e': b->R = b->G = b->B = 0;
+		  b->A = 0; 
+		  b->N = b->M = 0;
+		  b->dirty = 1;
 		break;
 
-	case '^': do_move(dir, &pos);			break;
-	case '<': dir = (dir - 1) & 3;			break;
-	case '>': dir = (dir + 1) & 3;			break;
-	case '=': mark = pos;				break;
+	case '^': do_move(s->dir, &s->pos);		break;
+	case '<': s->dir = (s->dir - 1) & 3;		break;
+	case '>': s->dir = (s->dir + 1) & 3;		break;
+	case '=': s->mark = s->pos;			break;
 	
-	case '-': draw_line(mark.X, mark.Y,
-			pos.X, pos.Y, bucket.col);	break;
+	case '-': draw_line(s);				break;
 
-	case '!': tryfill(pos.X, pos.Y, bucket.col);	break;
-	case '+': add_bitmap();				break;
-	case '*': do_compose();				break;
-	case '&': do_clip();				break;
+	case '!': tryfill(s);				break;
+
+	case '+': add_bitmap(s);			break;
+	case '*': do_compose(s);			break;
+	case '&': do_clip(s);				break;
 	
 	default:					break;
 	}
@@ -290,10 +307,10 @@ void	__color_test(void)
 	
 	while ((seq = seqs[i++])) {
 	    while (*seq)
-		build_cmd(*seq++);
+		build_cmd(&master, *seq++);
 	    printf("COL: ((%d,%d,%d),%d)\n",
-		RVAL(bucket.col), GVAL(bucket.col),
-		BVAL(bucket.col), AVAL(bucket.col));
+		RVAL(master.bucket.col), GVAL(master.bucket.col),
+		BVAL(master.bucket.col), AVAL(master.bucket.col));
 	}
 }
 
@@ -423,7 +440,7 @@ int	main(int argc, char *argv[])
 	    exit(1);
 	}
 	atexit(SDL_Quit);
-	screen = SDL_SetVideoMode(width, height, 32, 0);
+	screen = SDL_SetVideoMode(WIDTH, HEIGHT, 32, 0);
 	if (screen == NULL) {
 	    printf("Unable to set video mode: %s\n", SDL_GetError());
 	    exit(1);
@@ -448,6 +465,8 @@ int	main(int argc, char *argv[])
 	
 */
 
+	init_state(&master);
+
 	while (1) {
 	    int c;
 	    
@@ -463,25 +482,27 @@ int	main(int argc, char *argv[])
 	    if (opt_exitchar && (c == '.'))
 	    	break;
 
-	    build_cmd(c);
+	    build_cmd(&master, c);
 	
 	    if (opt_interactive) {
 		if (!opt_step || !(step % opt_step)) {
-		    visualize(&bitmaps[layer]);
+		    visualize(&master.bitmaps[master.layer]);
 		    fputc('.', stderr);
 	        }
 	    }
 	    step++;
 	}
 	
-	write_ppm(&bitmaps[0], stdout);
-	visualize(&bitmaps[0]);
+	// write_ppm(&master.bitmaps[0], stdout);
+	visualize(&master.bitmaps[0]);
 	
+	/* 
 	sleep(5);
-	calc_risk(&bitmaps[0], &risk);
+	calc_risk(&master.bitmaps[0], &risk);
 	visualize(&risk);
 	
 	sleep(5);
+	*/
 	if (opt_sleep)
 	    sleep(opt_sleep);
 	
