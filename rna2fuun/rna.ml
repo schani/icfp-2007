@@ -31,6 +31,9 @@ let string_of_dir = function
   | S -> "S"
   | W -> "W"
 
+let string_of_pos (x,y) =
+  "("^(string_of_int x)^","^(string_of_int y)^")"
+
 type rna_instr =
     | RI_RGB of rgb
     | RI_Alpha of transparency
@@ -82,7 +85,7 @@ let string_of_instr = function
   | RI_AddBitmap -> "AddBmap"
   | RI_Compose -> "Compose"
   | RI_Clip -> "Clip"
-  | RI_Ignore x -> "Ignore"
+  | RI_Ignore x -> ""
 
 let custromstring_of_instr = function
   | RI_Ignore str -> str
@@ -135,10 +138,11 @@ let createEmptyFastBucket () =
 let pixel_from_fastbucket fb =
   Lazy.force fb.fb_getPixel
 
+let string_of_pixel ((r,g,b),a) =
+  sprintf "(R=%03i,G=%03i,B=%03i,a=%03i)" r g b a
+
 let string_of_fastbucket fb =
-  let (r,g,b),a = pixel_from_fastbucket fb
-  in
-    sprintf "(R=%03i,G=%03i,B=%03i,a=%03i)" r g b a
+  string_of_pixel (pixel_from_fastbucket fb)
 
 let really_pixel_from_fastbucket fb =
   let (r,g,b),a = fb.fb_pixel
@@ -247,7 +251,7 @@ let rec fill st (initial : pixel) = function
   | p :: ps ->
       let x, y = p
       in
-	if (getPixel st p) == initial then begin
+	if (getPixel st p) = initial then begin
 	  setPixel st p;
 	  fill st initial
 	    ((x - 1, y) :: (x + 1, y) :: (x, y - 1) :: (x, y + 1) :: ps)
@@ -267,7 +271,7 @@ let tryfill st =
   let rec orig_fill st (p : pos) (initial : pixel) =
   let x,y = p
   in
-    if getPixel st p == initial then
+    if getPixel st p = initial then
       begin
 	if x > 0 then orig_fill st (x - 1, y) initial;
 	if x < 599 then orig_fill st (x + 1, y) initial;
