@@ -1,0 +1,16 @@
+pattern-len template-len
+pattern-rna-len template-rna-len	Number of RNA insns produced by pattern and template
+
+	only if match successful:
+match-len replacement-len
+	n times (each in one line, started by tabs):
+	match-start match-stop replacement-start replacement-stop
+
+
+example unsuccessful match:
+10 13 2 0
+
+example successful match:
+10 13 2 1 20 50
+	0 3 5 8
+	0 3 10 13
