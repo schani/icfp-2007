@@ -17,6 +17,8 @@ type meta_instr = {
 type bm_mode =
     GM_BITMAP | GM_SRC | GM_DST
 
+let history_granularity = 5000
+
 type gui = {
   mainWindow : GWindow.window;
   visual : Gdk.visual;
@@ -25,6 +27,7 @@ type gui = {
   mutable dest_toggler : GButton.toggle_button;
   mutable rating_mask_toggler : GButton.toggle_button;
   mutable rna_state : rna_state;
+  mutable rna_state_history : rna_state option array;
   instructions : meta_instr array;
   mutable currentPos : int;
   mutable currentBitmap : int;
@@ -193,26 +196,63 @@ let redraw_gui gui _ =
   update_gui gui ();
   false
 
-let step ?(break=false) gui i () =
-  let rec step_intern = function
-      0 -> ()
-    | i when break && 
-	  (List.memq gui.instructions.(gui.currentPos).mi_instr
-	      gui.breakPoints) ->
-	()
-    | i when gui.currentPos < Array.length gui.instructions ->
-	let inst = gui.instructions.(gui.currentPos)
+let rnaStep ?(break=false) gui i () =
+  let rec step_intern distance =
+    begin
+      if (gui.currentPos mod history_granularity) = 0 then
+	let histpos = gui.currentPos / history_granularity
 	in
-	  for j = 1 to inst.mi_count
-	  do
-	    apply_instr gui.rna_state inst.mi_instr
-	  done;
-	  gui.currentPos <- gui.currentPos + 1;
-	  step_intern (i - 1)
-    | _ -> ()
+	  match gui.rna_state_history.(histpos) with
+	      None ->
+		gui.rna_state_history.(histpos) <-
+		  Some (duplicate_rna_state gui.rna_state)
+	    | _ -> ()
+    end;
+    match distance with
+	0 -> ()
+      | i when break && 
+	    (List.memq gui.instructions.(gui.currentPos).mi_instr
+		gui.breakPoints) ->
+	  ()
+      | i when gui.currentPos < Array.length gui.instructions ->
+	  let inst = gui.instructions.(gui.currentPos)
+	  in
+	    for j = 1 to inst.mi_count
+	    do
+	      apply_instr gui.rna_state inst.mi_instr
+	    done;
+	    gui.currentPos <- gui.currentPos + 1;
+	    step_intern (i - 1)
+      | _ -> ()
   in
     step_intern i;
     update_gui gui ()
+
+let rnaReset gui =
+    gui.currentPos <- 0;
+    gui.rna_state <- createRNAState ()
+
+let rnaGoto gui newPos =
+  let rec find_history = function
+    | 0 -> 0, None
+    | i when gui.rna_state_history.(i) = None -> find_history (i - 1)
+    | i -> i, gui.rna_state_history.(i)
+  in let missingsteps =
+    match find_history (newPos / history_granularity) with
+	_, None -> rnaReset gui; newPos
+      | i, Some rs ->
+	  (*	  fprintf stderr "rolling back to history %i\n"
+		  (i * history_granularity);
+		  flush stderr;
+	  *)
+	  gui.currentPos <- i * history_granularity;
+	  gui.rna_state <- duplicate_rna_state rs;
+	  newPos - (i * history_granularity)
+  in
+       (*       fprintf stderr "goto executes %i steps now\n" missingsteps;
+		flush stderr;
+       *)
+       rnaStep gui missingsteps ()
 
 let breakpointChanged (combo : #GEdit.combo_box) gui () =
   gui.breakPoints <-
@@ -294,9 +334,12 @@ let setupGui (rna_instrs : rna_instr list) =
 				 (int_of_float (GdkEvent.Motion.x moEv))
 				 (int_of_float (GdkEvent.Motion.x moEv)));
        false
+  in let rna_state_history_size =
+    1 + (Array.length meta_instrs) / history_granularity
   in let gui = { mainWindow = w;
 		 visual = w#misc#visual;
 		 rna_state = createRNAState ();
+		 rna_state_history = Array.create rna_state_history_size None;
 		 instructions = meta_instrs;
 		 currentPos = 0;
 		 currentBitmap = 0;
@@ -332,13 +375,11 @@ let setupGui (rna_instrs : rna_instr list) =
       done;
       a
   in let reset_gui () =
-    gui.currentPos <- 0;
-    gui.rna_state <- createRNAState ();
+    rnaReset gui;
     update_gui gui ()
   in let goto_gui newPos =
     if newPos != gui.currentPos then begin
-      reset_gui ();
-      step gui newPos ();
+      rnaGoto gui newPos;
       update_gui gui ()
     end
   in let mi_convert i e =
@@ -397,14 +438,14 @@ let setupGui (rna_instrs : rna_instr list) =
     Array.iteri mi_convert meta_instrs;
     ignore (reset#connect#clicked ~callback:reset_gui);
     ignore (redraw#connect#clicked ~callback:(update_gui gui));
-    ignore (plus1#connect#clicked ~callback:(step gui 1));
-    ignore (plus10#connect#clicked ~callback:(step gui 10));
-    ignore (plus100#connect#clicked ~callback:(step gui 100));
-    ignore (plus1000#connect#clicked ~callback:(step gui 1000));
-    ignore (plus10000#connect#clicked ~callback:(step gui 10000));
+    ignore (plus1#connect#clicked ~callback:(rnaStep gui 1));
+    ignore (plus10#connect#clicked ~callback:(rnaStep gui 10));
+    ignore (plus100#connect#clicked ~callback:(rnaStep gui 100));
+    ignore (plus1000#connect#clicked ~callback:(rnaStep gui 1000));
+    ignore (plus10000#connect#clicked ~callback:(rnaStep gui 10000));
     ignore (areaEventBox#event#connect#motion_notify ~callback:mouseMoveCB);
     areaEventBox#event#add [`POINTER_MOTION];
-    ignore (runto#connect#clicked ~callback:(step ~break:true gui max_int));
+    ignore (runto#connect#clicked ~callback:(rnaStep ~break:true gui max_int));
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));
     ignore (w#connect#destroy ~callback:GMain.Main.quit);
     ignore (instrList#connect#select_row

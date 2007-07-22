@@ -111,6 +111,15 @@ type rna_state = {
   mutable bitmaps : bitmap list;
 }
 
+let duplicate_rna_state rs =
+  let bitmaps_copy bl =
+    let bitmap_copy bitmap =
+      Array.map Array.copy bitmap
+    in
+      List.map bitmap_copy bl
+  in
+    { rs with bitmaps = bitmaps_copy rs.bitmaps }
+
 let createEmptyFastBucket () =
   {
     fb_pixel = (0, 0, 0), 0;
