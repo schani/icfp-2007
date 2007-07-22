@@ -8,7 +8,7 @@ let green_zone_length = 0;;
 let rec data_template tpl =
   match tpl with
       [] -> true
-    | P_Base _ :: tpl -> data_template tpl
+    | T_Base _ :: tpl -> data_template tpl
     | _ -> false;;
 
 let print_write_green_data offset tpl =
@@ -20,6 +20,11 @@ let print_write_blue_data offset tpl =
 let print_reserve_stack_space len =
 ;;
 
+let print_function_call offset len =
+;;
+
+let print_function_return skip =
+;;
 
 (* val print_insn : pattern -> template -> int -> int -> int option *)
 let print_insn pat tpl rest_length stack_space =
@@ -81,8 +86,8 @@ let print_insn pat tpl rest_length stack_space =
 		      (0, 0, 1, 0) ->
 			if (skip1 = rest_length) && (skip2 + skip3 + skip4 = green_zone_length) &&
 			  ((length rest) = 48) then
-			    ((* function call *);
-			      Some stack_space)	(* FIXME: function can return value *)
+			    (print_function_call skip2 skip3;
+			     Some stack_space)	(* FIXME: function can return value *)
 			else
 			  raise Unknown_insn
 		    | _ -> raise Unknown_insn)
@@ -104,8 +109,8 @@ let print_insn pat tpl rest_length stack_space =
 		  in match (subn1, subl1, subn2, subl2, subn3, subl3) with
 		      (1, 0, 2, 0, 0, 0) ->
 			if skip1 = rest_length && skip2 = green_zone_length && skip3 = 24 && skip4 = 24 then
-			  ((* function return *);
-			    None)
+			  (print_function_return skip1;
+			   None)
 			else
 			  raise Unknown_insn
 		    | -> raise Unknown_insn)
