@@ -3,8 +3,25 @@ open Dna2rna;;
 open Printf;;
 open Big_int;;
 
-let dna = read_dna stdin
-in execute dna Rna.empty_rna 1;;
+let _ =
+  let speclist = [
+    ("-o", Arg.Set_string arg_output_filename, "rna output filename");
+    ("-H", Arg.String (fun s -> arg_history_filename := Some s),
+    "history output filename");
+    ("-M", Arg.String (fun s -> arg_metahistory_path := Some s),
+     "metahistory output directory");
+  ]
+  and usage_message =
+    Sys.argv.(0) ^ "usage: " ^ Sys.argv.(0) ^
+      "[ -H <history output filename> ] [ -M <metahistory output directory> ]"
+    ^ " -o <output filename>\n"
+  in
+    Arg.parse speclist
+      (fun s -> Arg.usage speclist (Printf.sprintf "illegal argument: %s" s))
+      usage_message;
+    let dna = read_dna stdin
+    in
+      execute dna Rna.empty_rna 1;;
 
 (*
 let rec find_intervals dna i =

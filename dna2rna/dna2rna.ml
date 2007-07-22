@@ -4,12 +4,16 @@ open Dnabuf
 open Printf
 open Big_int
 
+let arg_output_filename = ref "/void/endo/endo.rna"
+let arg_history_filename : string option ref = ref None
+let arg_metahistory_path : string option ref = ref None
+
 exception Hell;;
 
 (****************************************************************************)
 
 let finish rna =
-  let file = open_out "/void/endo/endo.rna"
+  let file = open_out !arg_output_filename
   in Rna.write_rna rna file;
     close_out file;
     exit 0;;
