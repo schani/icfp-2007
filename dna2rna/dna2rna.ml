@@ -63,13 +63,21 @@ let rec print_template = function
 
 (****************************************************************************)
 
-let rec get_nat (dna:dna) rna = 
+let rec get_nat dna =
   match consume dna with
-    | None -> finish rna
-    | Some(P,dna) -> (zero_big_int, dna)
+    | None -> (None, dna)
+    | Some(P,dna) -> (Some zero_big_int, dna)
     | Some(I,dna) 
-    | Some(F,dna) -> let (n,dna) = get_nat dna rna in (add_big_int n n, dna)
-    | Some(C,dna) -> let (n,dna) = get_nat dna rna in (add_big_int unit_big_int (add_big_int n n), dna)
+    | Some(F,dna) ->
+	 let (n,dna) = get_nat dna
+	 in (match n with
+		 Some n -> (Some (add_big_int n n), dna)
+	       | None -> (None, dna))
+    | Some(C,dna) ->
+	 let (n,dna) = get_nat dna
+	 in (match n with
+		 Some n -> (Some (add_big_int unit_big_int (add_big_int n n)), dna)
+	       | None -> (None, dna));;
 
 let get_consts dna_orig =
   let rec work dna_orig s =
@@ -100,8 +108,10 @@ let get_pattern dna rna lvl p_rev =
 	     | None -> finish rna
 	     | Some(C,dna) -> work dna rna lvl (P_Base(P)::p_rev) rna_length
 	     | Some(P,dna) -> 
-		 let (n, dna) = get_nat dna rna
-		 in work dna rna lvl (P_Skip(n)::p_rev) rna_length
+		 let (n, dna) = get_nat dna
+		 in (match n with
+			 Some n -> work dna rna lvl (P_Skip(n)::p_rev) rna_length
+		       | None -> finish rna)
 	     | Some(F,dna) ->
 		 let dna = skip dna 1 in 		(* three bases consumed *)
 		 let (s, dna) = get_consts dna
@@ -142,17 +152,21 @@ let get_template dna rna t_rev =
 	     | Some(C,dna) -> 
 		 work dna rna ((T_Base P)::t_rev) rna_length
 	     | Some(F,dna) | Some(P,dna) -> 
-		 let (l,dna) = get_nat dna rna in
-		 let (n,dna) = get_nat dna rna in
-	           work dna rna ((T_Sub(n,l))::t_rev) rna_length
+		 let (l,dna) = get_nat dna
+		 in let (n,dna) = get_nat dna
+		 in (match (l, n) with
+			 (Some l, Some n) -> work dna rna ((T_Sub(n,l))::t_rev) rna_length
+		       | _ -> finish rna)
 	     | Some(I,dna) ->
 		 (match consume dna with
 		    | Some(C,dna)
 		    | Some(F,dna) -> 
 			(dna,rna,List.rev t_rev, rna_length)
 		    | Some(P,dna) -> 
-			let (n,dna) = get_nat dna rna in 
-			  work dna rna ((T_Abs(n))::t_rev) rna_length
+			let (n,dna) = get_nat dna
+			in (match n with
+				Some n -> work dna rna ((T_Abs(n))::t_rev) rna_length
+			      | _ -> finish rna)
 		    | Some(I,dna) -> 
 			let rna = Rna.concat_rna rna (subbuf dna 0 7) in
 			let dna = skip dna 7 in

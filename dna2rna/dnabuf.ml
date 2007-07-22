@@ -157,7 +157,7 @@ let rec flatten buf =
       in
 	(* print_string "flattening "; print_int buf_len; print_newline (); *)
 	blit buf 0 buf_len;
-	print_string "done flattening: "; print_int !num_orig; print_string " same: "; print_int !num_concat_same;  print_newline ();
+	(* print_string "done flattening: "; print_int !num_orig; print_string " same: "; print_int !num_concat_same;  print_newline (); *)
 	ArrayBuf (new_buf, buf_len, false);;
 
 let rec dna_to_string buf =
