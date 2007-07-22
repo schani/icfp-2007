@@ -1,3 +1,9 @@
+; to use:
+;
+; clisp
+; (load "dnalang.lisp")
+; (in-package :dnalang)
+
 (load "utils.lisp")
 (load "let-match.lisp")
 
@@ -120,3 +126,7 @@
 (defun prepend-green-fragment (offset len)
   (compile-rule `((group (? ,*greenzonestart*) ,(- offset (length *greenzonestart*)) (group ,len)))
 		'((0 _ 0) (1 _ 0))))
+
+(defun compile-activate (offset len)
+  (compile-rule '((group (? "IFPICFPPCCC") (group (? "IFPICFPPCCC"))))
+		`((0 _ 0) ,(asnat offset) ,(asnat len) (1 _ 0))))
