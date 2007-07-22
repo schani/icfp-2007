@@ -1,4 +1,5 @@
 open Dnabuf
+open Zweiungvierzig
 
 exception Unknown_insn;;
 
@@ -11,19 +12,49 @@ let rec data_template tpl =
     | T_Base _ :: tpl -> data_template tpl
     | _ -> false;;
 
+let rec bases2str tpl acc = 
+  match tpl with
+    | [] -> acc
+    | T_Base x :: tpl -> bases2str tpl (acc^x)
+    | _ -> assert false
+
+let print_offset_data mnem offset tpl = 
+  let n,_,_,_ = get_answer offset in
+  let str = (bases2str tpl "") in
+    print_string mnem;
+    print_string " "; 
+    print_string n;
+    print_string ", ";
+    print_string str;
+    print_newline ()
+      
 let print_write_green_data offset tpl =
+  print_offset_data "wgz" offset tpl
 ;;
 
 let print_write_blue_data offset tpl =
+  print_offset_data "wbz" offset tpl
 ;;
 
 let print_reserve_stack_space len =
+  print_string "morestack ";
+  print_int len;
+  print_newline ();
 ;;
 
 let print_function_call offset len =
+  print_string "call -> ";
+  print_int offset;
+  print_string " (<";
+  print_int len;
+  print_string ")";
+  print_newline ()
 ;;
 
 let print_function_return skip =
+  print_string "ret ";
+  print_int skip;
+  print_newline ()
 ;;
 
 (* val print_insn : pattern -> template -> int -> int -> int option *)

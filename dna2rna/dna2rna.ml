@@ -1,5 +1,3 @@
-(* -*- fundamental -*- *)
-
 open Dnabuf
 open Printf
 open Big_int
@@ -351,6 +349,9 @@ let rec execute dna rna i =
 	    let dna = if (!i mod 2000) = 1999 then (flatten dna) else dna
 	      (* in let rna = if (!i mod 2000) = 1999 then (flatten rna) else rna *)
 	    in (* visualize dna; print_newline (); *)
+	      if !i = 1 then
+		(let oc = open_out "/tmp/after1.dna" in 
+		   write_dna dna oc; close_out oc);
 	      the_dna := dna;
 	      the_rna := rna;
 	      i := !i + 1
