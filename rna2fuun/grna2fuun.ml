@@ -201,7 +201,7 @@ let redraw_gui gui _ =
   update_gui gui ();
   false
 
-let rnaStep ?(break=false) gui i () =
+let rnaStep ?(break=false) gui i =
   let rec step_intern distance =
     begin
       if (gui.currentPos mod history_granularity) = 0 then
@@ -257,7 +257,7 @@ let rnaGoto gui newPos =
        (*       fprintf stderr "goto executes %i steps now\n" missingsteps;
 		flush stderr;
        *)
-       rnaStep gui missingsteps ()
+       rnaStep gui missingsteps
 
 let breakpointChanged (combo : #GEdit.combo_box) gui () =
   gui.breakPoints <-
@@ -267,7 +267,7 @@ let breakpointChanged (combo : #GEdit.combo_box) gui () =
 let setupGui (rna_instrs : rna_instr list) =
   let meta_instrs = Array.of_list (meta_instrs_from_rna_instrs rna_instrs)
   in let w = GWindow.window ~title:"grna2fuun"
-    ~show:true ~width:1000 ~height:750 ()
+    ~show:true ~width:1200 ~height:800 ()
     (* rest | cmdlist *)
   in let hb1 = GPack.hbox ~border_width:4 ~spacing:4 ~packing:w#add ()
     (* image notebook - small images - status - commands *)
@@ -328,7 +328,6 @@ let setupGui (rna_instrs : rna_instr list) =
     and rating = computeRating currentBitmap gui.destBitmap
     in
       instrList#select gui.currentPos 1;
-      instrList#moveto (abs (gui.currentPos - 5)) 1;
       posLabel#set_text (sprintf "(%i,%i)" posix posiy);
       markLabel#set_text (sprintf "(%i,%i)" markx marky);
       dirLabel#set_text (string_of_dir rnaState.dir);
@@ -401,6 +400,9 @@ let setupGui (rna_instrs : rna_instr list) =
       rnaGoto gui newPos;
       update_gui gui ()
     end
+  in let step_gui ?(break=false) i () =
+    rnaStep ~break gui i;
+       instrList#moveto (abs (gui.currentPos - 5)) 1
   in let mi_convert i e =
     ignore (instrList#append [string_of_int i;
 			      string_of_int e.mi_count;
@@ -458,15 +460,15 @@ let setupGui (rna_instrs : rna_instr list) =
     Array.iteri mi_convert meta_instrs;
     ignore (reset#connect#clicked ~callback:reset_gui);
     ignore (redraw#connect#clicked ~callback:(update_gui gui));
-    ignore (plus1#connect#clicked ~callback:(rnaStep gui 1));
-    ignore (plus10#connect#clicked ~callback:(rnaStep gui 10));
-    ignore (plus100#connect#clicked ~callback:(rnaStep gui 100));
-    ignore (plus1000#connect#clicked ~callback:(rnaStep gui 1000));
-    ignore (plus10000#connect#clicked ~callback:(rnaStep gui 10000));
+    ignore (plus1#connect#clicked ~callback:(step_gui 1));
+    ignore (plus10#connect#clicked ~callback:(step_gui 10));
+    ignore (plus100#connect#clicked ~callback:(step_gui 100));
+    ignore (plus1000#connect#clicked ~callback:(step_gui 1000));
+    ignore (plus10000#connect#clicked ~callback:(step_gui 10000));
     ignore (areaEventBox#event#connect#motion_notify
 	       ~callback:(mouseMoveCB gui));
     areaEventBox#event#add [`POINTER_MOTION];
-    ignore (runto#connect#clicked ~callback:(rnaStep ~break:true gui max_int));
+    ignore (runto#connect#clicked ~callback:(step_gui ~break:true max_int));
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));
     ignore (w#connect#destroy ~callback:GMain.Main.quit);
     ignore (instrList#connect#select_row
