@@ -28,7 +28,11 @@ let print_function_return skip =
 
 (* val print_insn : pattern -> template -> int -> int -> int option *)
 let print_insn pat tpl rest_length stack_space =
-  let in_green_zone addr =
+  let in_green_zone addr len =
+    (let start = addr - rest_length
+     and stop = addr + len - rest_length
+     in
+       (start >= 0) && (start < green_zone_length) && (stop >= 0) && (stop < green_zone_length))
   in
     match pat with
 	[P_ParenL; P_Skip skip1; P_ParenR; P_Skip skip2] ->
@@ -120,10 +124,19 @@ let print_insn pat tpl rest_length stack_space =
 	  raise Unknown_insn;;
 
 let disassemble dna =
-  let rec disasm dna =
-    let (dna, rna, pattern, _) = get_pattern dna []
-    in output_rnas rna;
-      let (dna, rna, template, _) = get_template dna []
-      in output_rnas rna;
-	output_insn pattern template (length dna);
-	disasm dna;;
+  let rec disasm dna stack_space =
+    (let (dna, rna, pattern, _) = get_pattern dna []
+     in output_rnas rna;
+       let (dna, rna, template, _) = get_template dna []
+       in output_rnas rna;
+	 try
+	   match print_insn pattern template (length dna) stack_space with
+	       Some stack_space -> disasm dna stack_space
+	     | None -> ()
+	 with
+	     Unknown_insn ->
+	       print_string "Unknown insn: pattern: "; print_pattern pattern; print_newline ();
+	       print_string "template: "; print_template template; print_newline ();
+	       ())
+  in
+    disasm dna 0;;
