@@ -84,15 +84,12 @@ let string_of_instr = function
 let transparent : transparency = 0
 let opaque : transparency = 255
 
-let createDemoBitmap () =
+let createOpaqueBitmap () =
   let opaquePixel = ((black, opaque) : pixel)
   in let bm = ((Array.create 600 (Array.create 0 opaquePixel)) : bitmap)
   in
     for y = 0 to 599 do
       bm.(y) <- Array.create 600 opaquePixel;
-      for x = 0 to 599 do
-	bm.(y).(x) <- ((y, y, y), opaque)
-      done
     done;
     bm
 

@@ -23,6 +23,7 @@ type gui = {
   mutable bitmapSelectorButtons : GButton.toggle_button array;
   mutable src_toggler : GButton.toggle_button;
   mutable dest_toggler : GButton.toggle_button;
+  mutable rating_mask_toggler : GButton.toggle_button;
   mutable rna_state : rna_state;
   instructions : meta_instr array;
   mutable currentPos : int;
@@ -32,12 +33,30 @@ type gui = {
   mutable breakPoints : rna_instr list;
   mutable srcImg : Gdk.image option;
   mutable destImg : Gdk.image option;
+  mutable destBitmap : bitmap;
   mutable bmMode : bm_mode;
 }
 
 let usage () =
   fprintf stderr "usage not yet written, sorry";
   exit 1
+
+let bitmap_from_gdkPixbuf pixbuf =
+  let bytes = GdkPixbuf.get_pixels pixbuf
+  and bitmap = createTransparentBitmap ()
+  and i = ref 0
+  in
+    for y = 0 to 599 do
+      for x = 0 to 599 do
+	let p = ((Gpointer.get_byte bytes ~pos:!i),
+		(Gpointer.get_byte bytes ~pos:(!i + 1)),
+		(Gpointer.get_byte bytes ~pos:(!i + 2))), 255
+	in
+	  bitmap.(y).(x) <- p;
+	  i := !i + 3
+      done
+    done;
+    bitmap
 
 let gdkImage_from_gdkPixbuf gui pixbuf =
   let bytes = GdkPixbuf.get_pixels pixbuf
@@ -57,6 +76,20 @@ let gdkImage_from_gdkPixbuf gui pixbuf =
     done;
     img
 
+let computeRating bitmap optimalBitmap =
+  let errors = ref 0
+  in
+    for y = 0 to 599 do
+      for x = 0 to 599 do
+	let p1,_ = bitmap.(y).(x)
+	and p2,_ = optimalBitmap.(y).(x)
+	in
+	  if not (p1 = p2) then
+	    incr errors
+      done
+    done;
+    !errors
+
 let meta_instrs_from_rna_instrs = function
     [] -> []
   | x :: xs ->
@@ -74,10 +107,15 @@ let meta_instrs_from_rna_instrs = function
 let displayBitmap gui bitmap darea =
   let image = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
     ~width:600 ~height:600
+  and useMask = if gui.rating_mask_toggler#active then true else false
   in
     for y = 0 to 599 do
       for x = 0 to 599 do
-	let ((r,g,b), a) = bitmap.(y).(x)
+	let ((r,g,b), a) =
+	  if useMask && bitmap.(y).(x) = gui.destBitmap.(y).(x) then
+	    red, 255
+	  else
+	    bitmap.(y).(x)
 	in
 	  Gdk.Image.put_pixel image ~x:x ~y:y
 	    ~pixel:(Gdk.Truecolor.color_creator gui.visual
@@ -196,6 +234,8 @@ let setupGui (rna_instrs : rna_instr list) =
     ~width:600 ~height:600 ~packing:vbMain#add ()
   in let hbStatus = GPack.hbox ~border_width:4 ~spacing:4
     ~packing:vbMain#add ()
+  in let hbStatus2 = GPack.hbox ~border_width:4 ~spacing:4
+    ~packing:vbMain#add ()
   in let hbCmd = GPack.hbox ~border_width:4 ~spacing:4
     ~packing:vbMain#add ()
   in let instrListBar = GRange.scrollbar `VERTICAL
@@ -226,6 +266,7 @@ let setupGui (rna_instrs : rna_instr list) =
   in let bitmapsLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let statelistlenlabel = GMisc.label ~text:"RNAs:"
     ~packing:hbStatus#pack ()
+  in let ratingLabel = GMisc.label ~text:"Rating: ? (?%)" ~packing:hbStatus2#pack ()
   in let mouseCoordLabel = GMisc.label ~text:"Mouse()"
     ~packing:hbStatus#pack ()
   in let area = GMisc.drawing_area ~width:600 ~height:600
@@ -235,6 +276,7 @@ let setupGui (rna_instrs : rna_instr list) =
     let rnaState = gui.rna_state
     in let posix, posiy = rnaState.Rna.position
     and markx, marky = rnaState.mark
+    and rating = computeRating (List.hd gui.rna_state.bitmaps) gui.destBitmap
     in
       instrList#select gui.currentPos 1;
       instrList#moveto (abs (gui.currentPos - 5)) 1;
@@ -242,6 +284,9 @@ let setupGui (rna_instrs : rna_instr list) =
       markLabel#set_text (sprintf "(%i,%i)" markx marky);
       dirLabel#set_text (string_of_dir rnaState.dir);
       bitmapsLabel#set_text (string_of_int (List.length rnaState.bitmaps));
+      ratingLabel#set_text (sprintf "Rating: %i (%f%%)" rating
+			       ((float_of_int (600*600 - rating))
+				 /. (600.0 *. 6.0)));
       statelistlenlabel#set_text (sprintf "RNA: %i/%i"
 				     gui.currentPos (Array.length meta_instrs))
   in let mouseMoveCB moEv =
@@ -258,8 +303,10 @@ let setupGui (rna_instrs : rna_instr list) =
 		 drawing = drawing;
 		 breakPoints = [];
 		 bitmapSelectorButtons = [| |];
+		 destBitmap = createTransparentBitmap ();
 		 src_toggler = GButton.toggle_button ();
 		 dest_toggler = GButton.toggle_button ();
+		 rating_mask_toggler = GButton.toggle_button ();
 		 update_status_fun = update_status;
 		 srcImg = None;
 		 destImg = None;
@@ -299,6 +346,8 @@ let setupGui (rna_instrs : rna_instr list) =
 			      string_of_int e.mi_count;
 			      string_of_instr e.mi_instr;
                               string_of_int e.mi_rnaline])
+  and rmt_cb () =
+    update_gui gui ()
   and srcdest_cb who what () =
     if who#active then
       begin
@@ -320,23 +369,31 @@ let setupGui (rna_instrs : rna_instr list) =
        end;
     begin
       try
-	gui.destImg <- Some (gdkImage_from_gdkPixbuf gui
-				(GdkPixbuf.from_file "target.png"))
+	let pixbuf = (GdkPixbuf.from_file "target.png")
+	in
+	  gui.destImg <- Some (gdkImage_from_gdkPixbuf gui
+				  (GdkPixbuf.from_file "target.png"));
+	  gui.destBitmap <- bitmap_from_gdkPixbuf pixbuf
       with
 	  _ ->
 	    fprintf stderr "failed to load target.png\n"; flush stderr
     end;
     breakCombo#set_active 0;
     ignore (breakCombo#connect#changed (breakpointChanged breakCombo gui));
-    gui.bitmapSelectorButtons <- createBitmapSelectorButtons ();
     gui.src_toggler <-
       GButton.toggle_button ~label:"SRC" ~packing:hbImgSelButs#pack ();
     ignore (gui.src_toggler#connect#clicked
 	       ~callback:(srcdest_cb gui.src_toggler GM_SRC));
     gui.dest_toggler <-
       GButton.toggle_button ~label:"DST" ~packing:hbImgSelButs#pack ();
+    ignore (GMisc.separator `VERTICAL ~packing:hbImgSelButs#pack ());
+    gui.bitmapSelectorButtons <- createBitmapSelectorButtons ();
     ignore (gui.dest_toggler#connect#clicked
 	       ~callback:(srcdest_cb gui.dest_toggler GM_DST));
+    ignore (GMisc.separator `VERTICAL ~packing:hbImgSelButs#pack ());
+    gui.rating_mask_toggler <-
+      GButton.toggle_button ~label:"Rating" ~packing:hbImgSelButs#pack ();
+    ignore (gui.rating_mask_toggler#connect#toggled ~callback:rmt_cb);
     Array.iteri mi_convert meta_instrs;
     ignore (reset#connect#clicked ~callback:reset_gui);
     ignore (redraw#connect#clicked ~callback:(update_gui gui));
