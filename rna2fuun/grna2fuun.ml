@@ -34,6 +34,7 @@ type gui = {
   drawing : GDraw.drawable;
   update_status_fun : gui -> unit;
   mutable breakPoints : rna_instr list;
+  mutable commentBreakRegexp : Str.regexp option;
   mutable srcImg : Gdk.image option;
   mutable destImg : Gdk.image option;
   mutable destBitmap : bitmap;
@@ -203,32 +204,39 @@ let redraw_gui gui _ =
 
 let rnaStep ?(break=false) gui i =
   let rec step_intern distance =
-    begin
-      if (gui.currentPos mod history_granularity) = 0 then
-	let histpos = gui.currentPos / history_granularity
-	in
-	  match gui.rna_state_history.(histpos) with
-	      None ->
-		gui.rna_state_history.(histpos) <-
-		  Some (duplicate_rna_state gui.rna_state)
-	    | _ -> ()
-    end;
-    match distance with
-	0 -> ()
-      | i when break && 
-	    (List.memq gui.instructions.(gui.currentPos).mi_instr
-		gui.breakPoints) ->
-	  ()
-      | i when gui.currentPos < Array.length gui.instructions ->
-	  let inst = gui.instructions.(gui.currentPos)
+    let inst = gui.instructions.(gui.currentPos)
+    in
+      begin (* record history *)
+	if (gui.currentPos mod history_granularity) = 0 then
+	  let histpos = gui.currentPos / history_granularity
 	  in
-	    for j = 1 to inst.mi_count
-	    do
-	      apply_instr gui.rna_state inst.mi_instr
-	    done;
-	    gui.currentPos <- gui.currentPos + 1;
-	    step_intern (i - 1)
-      | _ -> ()
+	    match gui.rna_state_history.(histpos) with
+		None ->
+		  gui.rna_state_history.(histpos) <-
+		    Some (duplicate_rna_state gui.rna_state)
+	      | _ -> ()
+      end;
+      match gui.commentBreakRegexp, inst.mi_instr with
+	  (* check for regexp breakpoint *)
+	| Some regex, RI_Ignore str when Str.string_match regex str 0 ->
+	    printf "regexp breakpoint match!\n"; flush stdout;
+	    ()
+	| _ -> begin
+	    match distance with
+		0 -> ()
+	      | i when break && (* check for breakpoint *)
+		    (List.memq inst.mi_instr gui.breakPoints) ->
+		  printf "instruction breakpoint match!\n"; flush stdout;
+		      ()
+	      | i when gui.currentPos < Array.length gui.instructions ->
+		  for j = 1 to inst.mi_count
+		  do
+		    apply_instr gui.rna_state inst.mi_instr
+		  done;
+		  gui.currentPos <- gui.currentPos + 1;
+		  step_intern (i - 1)
+	      | _ -> ()
+	  end
   in
     step_intern i;
     update_gui gui ()
@@ -238,7 +246,12 @@ let rnaReset gui =
     gui.rna_state <- createRNAState ()
 
 let rnaGoto gui newPos =
-  let rec find_history = function
+  let newPos = if newPos < 0 then 0 else
+      if newPos >= Array.length gui.instructions then
+	Array.length gui.instructions
+    else
+      newPos
+  in let rec find_history = function
     | 0 -> 0, None
     | i when gui.rna_state_history.(i) = None -> find_history (i - 1)
     | i -> i, gui.rna_state_history.(i)
@@ -283,24 +296,32 @@ let setupGui (rna_instrs : rna_instr list) =
     ~packing:vbMain#add ()
   in let hbCmd = GPack.hbox ~border_width:4 ~spacing:4
     ~packing:vbMain#add ()
+  in let hbCmd2 = GPack.hbox ~border_width:4 ~spacing:4
+    ~packing:vbMain#add ()
   in let instrListBar = GRange.scrollbar `VERTICAL
     ~packing:(hb1#pack ~from:`END) ()
   in let instrList = GList.clist
     ~titles:["Number";"Count";"Command";"RNA-Line";"Custom Data like Comment"]
     ~shadow_type:`OUT ~vadjustment:instrListBar#adjustment
     ~packing:(hb1#pack ~expand:true) ()
-  in let reset = GButton.button ~label:"reset" ~packing:hbCmd#pack ()
-  in let redraw = GButton.button ~label:"redraw" ~packing:hbCmd#pack ()
+  in let minus10000 = GButton.button ~label:"-10000" ~packing:hbCmd#pack ()
+  in let minus1000 = GButton.button ~label:"-1000" ~packing:hbCmd#pack ()
+  in let minus100 = GButton.button ~label:"-100" ~packing:hbCmd#pack ()
+  in let minus10 = GButton.button ~label:"-10" ~packing:hbCmd#pack ()
+  in let minus1 = GButton.button ~label:"-1" ~packing:hbCmd#pack ()
   in let plus1 = GButton.button ~label:"+1" ~packing:hbCmd#pack ()
   in let plus10 = GButton.button ~label:"+10" ~packing:hbCmd#pack ()
   in let plus100 = GButton.button ~label:"+100" ~packing:hbCmd#pack ()
   in let plus1000 = GButton.button ~label:"+1000" ~packing:hbCmd#pack ()
   in let plus10000 = GButton.button ~label:"+10000" ~packing:hbCmd#pack ()
-  in let runto = GButton.button ~label:"Run to:" ~packing:hbCmd#pack ()
+  in let reset = GButton.button ~label:"reset" ~packing:hbCmd2#pack ()
+  in let redraw = GButton.button ~label:"redraw" ~packing:hbCmd2#pack ()
+  in let runto = GButton.button ~label:"Run to:" ~packing:hbCmd2#pack ()
   in let (breakCombo, (_, breakComboColumn)) =
-    GEdit.combo_box_text ~packing:hbCmd#pack 
+    GEdit.combo_box_text ~packing:hbCmd2#pack 
       ~strings:["End" ; "Compose/AddBitmap" ; "Compose" ; "AddBitmap" ;
 		"Clip" ; "Fill";] ()
+  in let breakEntry = GEdit.entry ~packing:hbCmd2#pack ()
   in let _ = GMisc.label ~text:"POS:" ~packing:hbStatus#pack ()
   in let posLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let _ = GMisc.label ~text:"MARK:" ~packing:hbStatus#pack ()
@@ -363,6 +384,7 @@ let setupGui (rna_instrs : rna_instr list) =
 		 currentBitmap = 0;
 		 drawing = drawing;
 		 breakPoints = [];
+		 commentBreakRegexp = None;
 		 bitmapSelectorButtons = [| |];
 		 destBitmap = createTransparentBitmap ();
 		 src_toggler = GButton.toggle_button ();
@@ -402,7 +424,10 @@ let setupGui (rna_instrs : rna_instr list) =
     end
   in let step_gui ?(break=false) i () =
     rnaStep ~break gui i;
-       instrList#moveto (abs (gui.currentPos - 5)) 1
+    instrList#moveto (max (gui.currentPos - 8) 0) 1
+  in let rstep_gui i () =
+    goto_gui (gui.currentPos - i);
+    instrList#moveto (max (gui.currentPos - 8) 0) 1
   in let mi_convert i e =
     ignore (instrList#append [string_of_int i;
 			      string_of_int e.mi_count;
@@ -465,8 +490,20 @@ let setupGui (rna_instrs : rna_instr list) =
     ignore (plus100#connect#clicked ~callback:(step_gui 100));
     ignore (plus1000#connect#clicked ~callback:(step_gui 1000));
     ignore (plus10000#connect#clicked ~callback:(step_gui 10000));
+    ignore (minus1#connect#clicked ~callback:(rstep_gui 1));
+    ignore (minus10#connect#clicked ~callback:(rstep_gui 10));
+    ignore (minus100#connect#clicked ~callback:(rstep_gui 100));
+    ignore (minus1000#connect#clicked ~callback:(rstep_gui 1000));
+    ignore (minus10000#connect#clicked ~callback:(rstep_gui 10000));
     ignore (areaEventBox#event#connect#motion_notify
 	       ~callback:(mouseMoveCB gui));
+    ignore (breakEntry#connect#activate
+	       ~callback:(fun () -> gui.commentBreakRegexp <-
+		 match breakEntry#text with
+		     "" -> None
+		   | str -> breakEntry#select_region
+		       ~start:0 ~stop:breakEntry#text_length;
+		       Some (Str.regexp str)));
     areaEventBox#event#add [`POINTER_MOTION];
     ignore (runto#connect#clicked ~callback:(step_gui ~break:true max_int));
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));
