@@ -30,14 +30,32 @@ type gui = {
   drawing : GDraw.drawable;
   update_status_fun : gui -> unit;
   mutable breakPoints : rna_instr list;
-  mutable src_pixbuf : GdkPixbuf.pixbuf option;
-  mutable dest_pixbuf : GdkPixbuf.pixbuf option;
+  mutable srcImg : Gdk.image option;
+  mutable destImg : Gdk.image option;
   mutable bmMode : bm_mode;
 }
 
 let usage () =
   fprintf stderr "usage not yet written, sorry";
   exit 1
+
+let gdkImage_from_gdkPixbuf gui pixbuf =
+  let bytes = GdkPixbuf.get_pixels pixbuf
+  and img = Gdk.Image.create ~kind:`FASTEST ~visual:gui.visual
+    ~width:600 ~height:600
+  and i = ref 0
+  in
+    for y = 0 to 599 do
+      for x = 0 to 599 do
+	Gdk.Image.put_pixel img ~x ~y
+	  ~pixel:(Gdk.Truecolor.color_creator gui.visual
+		     ~red:(256 * (Gpointer.get_byte bytes ~pos:!i))
+		     ~green:(256 * (Gpointer.get_byte bytes ~pos:(!i + 1)))
+		     ~blue:(256 * (Gpointer.get_byte bytes ~pos:(!i + 2))));
+	i := !i + 3
+      done
+    done;
+    img
 
 let meta_instrs_from_rna_instrs = function
     [] -> []
@@ -68,11 +86,18 @@ let displayBitmap gui bitmap darea =
     done;
     gui.drawing#put_image image ~x:0 ~y:0
 
+let displayImage gui = function
+  | Some img ->
+      gui.drawing#put_image img ~x:0 ~y:0
+  | None -> 
+      fprintf stderr "failed to draw Gdk.Image :(\n";
+      flush stderr
+
 let displayPixBuf gui = function
   | Some pixbuf ->
       gui.drawing#put_pixbuf ~x:0 ~y:0 pixbuf
   | None ->
-      fprintf stderr "failed to draw pixbuf :(\n";
+      fprintf stderr "failed to draw Gdk.PixBuf :(\n";
       flush stderr
 
 let adjustImageSelectorButtons gui =
@@ -119,9 +144,9 @@ let update_gui gui () =
 	  displayBitmap gui (List.nth gui.rna_state.bitmaps
 				gui.currentBitmap) gui.drawing;
       | GM_SRC ->
-	  displayPixBuf gui gui.src_pixbuf
+	  displayImage gui gui.srcImg
       | GM_DST ->
-	  displayPixBuf gui gui.dest_pixbuf
+	  displayImage gui gui.destImg
   end;
   gui.update_status_fun gui
     (*  displayBitmapManually gui (List.hd gui.rna_state.bitmaps) *)
@@ -236,8 +261,8 @@ let setupGui (rna_instrs : rna_instr list) =
 		 src_toggler = GButton.toggle_button ();
 		 dest_toggler = GButton.toggle_button ();
 		 update_status_fun = update_status;
-		 src_pixbuf = None;
-		 dest_pixbuf = None;
+		 srcImg = None;
+		 destImg = None;
 		 bmMode = GM_BITMAP;
   }
   in let select_bitmap nr () =
@@ -287,14 +312,16 @@ let setupGui (rna_instrs : rna_instr list) =
   in
        begin
 	 try
-	   gui.src_pixbuf <- Some (GdkPixbuf.from_file "source.png")
+	   gui.srcImg <- Some (gdkImage_from_gdkPixbuf gui
+				  (GdkPixbuf.from_file "source.png"))
 	 with
 	     _ ->
 	       fprintf stderr "failed to load source.png\n"; flush stderr
        end;
     begin
       try
-	gui.dest_pixbuf <- Some (GdkPixbuf.from_file "target.png")
+	gui.destImg <- Some (gdkImage_from_gdkPixbuf gui
+				(GdkPixbuf.from_file "target.png"))
       with
 	  _ ->
 	    fprintf stderr "failed to load target.png\n"; flush stderr
