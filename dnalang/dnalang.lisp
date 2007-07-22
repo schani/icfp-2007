@@ -20,6 +20,19 @@
 	(t
 	 (string-concat "C" (asnat (ash n -1) terminator)))))
 
+(defun multiply-string (n str)
+  (cond ((zerop n) "")
+	(t 
+	 (string-concat str (multiply-string (1- n) str)))))
+
+
+(defun asnat-fixedwidth (n len)
+  (let* ((an (asnat n nil))
+	 (l  (length an)))
+    (assert (<= l len))
+    (string-concat an (multiply-string (- len l 1) "I") "P")))
+	
+  
 (defun quote-dna (str)
   (apply #'string-concat
 	 (map 'list #'(lambda (c)
@@ -130,3 +143,15 @@
 (defun compile-activate (offset len)
   (compile-rule '((group (? "IFPICFPPCCC") (group (? "IFPICFPPCCC"))))
 		`((0 _ 0) ,(asnat offset) ,(asnat len) (1 _ 0))))
+
+
+(defun compile-pass-arg (arg) 
+  (compile-rule '((group (? "IFPICFPPCFIPP")))
+		`((0 _ 0) ,(cond
+			    ((stringp arg)
+			     arg)
+			    ((integerp arg)
+			     (asnat-fixedwidth arg 24))
+			    ((t)
+			     (assert NIL))))))
+			     
