@@ -119,7 +119,7 @@
 (defvar *greenzonestart* "IFPICFPPCFFPP")
 
 (defun modify-green-zone (offset newval)
-  (compile-rule `((group (? ,*greenzonestart*) ,(- offset 1 (length *greenzonestart*))) ,(length newval))
+  (compile-rule `((group (? ,*greenzonestart*) ,(- offset (length *greenzonestart*))) ,(length newval))
 		`((0 _ 0) ,newval)
    ))
 
