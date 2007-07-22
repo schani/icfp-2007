@@ -30,14 +30,29 @@ let parse_line str =
     | '?' -> RI_Ignore (Str.string_after str 1)
     | _ -> assert false
 
+let parse_fast ich =
+  let newline_regexp = Str.regexp "[\n]+"
+  in let file_len = in_channel_length ich
+  in let buf = String.create file_len
+  in
+    really_input ich buf 0 file_len;
+    let strings = Str.split newline_regexp buf
+    in
+      List.map parse_line strings
+
 let read_trace filename =
   let ich = open_in filename
-  and data = ref []
   in
-    try
-      while true do
-	data := (parse_line (input_line ich)) :: !data
-      done;
-      !data
-    with
-	End_of_file -> List.rev !data
+    if in_channel_length ich < 1024*1024*15
+    then
+      parse_fast ich
+    else
+      let data = ref []
+      in
+	try
+	  while true do
+	    data := (parse_line (input_line ich)) :: !data
+	  done;
+	  !data
+	with
+	    End_of_file -> List.rev !data

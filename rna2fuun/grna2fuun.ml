@@ -314,6 +314,7 @@ let setupGui (rna_instrs : rna_instr list) =
   in let plus100 = GButton.button ~label:"+100" ~packing:hbCmd#pack ()
   in let plus1000 = GButton.button ~label:"+1000" ~packing:hbCmd#pack ()
   in let plus10000 = GButton.button ~label:"+10000" ~packing:hbCmd#pack ()
+  in let gotoEntry = GEdit.entry ~width:80 ~packing:hbCmd#pack ()
   in let reset = GButton.button ~label:"reset" ~packing:hbCmd2#pack ()
   in let redraw = GButton.button ~label:"redraw" ~packing:hbCmd2#pack ()
   in let runto = GButton.button ~label:"Run to:" ~packing:hbCmd2#pack ()
@@ -332,8 +333,6 @@ let setupGui (rna_instrs : rna_instr list) =
   in let bucketLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let _ = GMisc.label ~text:"BITMAPS:" ~packing:hbStatus#pack ()
   in let bitmapsLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
-  in let statelistlenlabel = GMisc.label ~text:"RNAs:"
-    ~packing:hbStatus#pack ()
   in let ratingLabel = GMisc.label ~text:"Rating: ? (?%)"
     ~packing:hbStatus2#pack ()
   in let mouseInfoLabel = GMisc.label ~text:"Mouse()"
@@ -357,8 +356,6 @@ let setupGui (rna_instrs : rna_instr list) =
       ratingLabel#set_text (sprintf "Rating: %i (%f%%)" rating
 			       ((float_of_int (600*600 - rating))
 				 /. (600.0 *. 6.0)));
-      statelistlenlabel#set_text (sprintf "RNA: %i/%i"
-				     gui.currentPos (Array.length meta_instrs))
   in let mouseMoveCB gui moEv =
     try
       let currentBitmap = get_current_bitmap gui
@@ -422,6 +419,14 @@ let setupGui (rna_instrs : rna_instr list) =
       rnaGoto gui newPos;
       update_gui gui ()
     end
+  in let gotoEntryCB () =
+    try
+      goto_gui (int_of_string gotoEntry#text);
+      instrList#moveto (max (gui.currentPos - 8) 0) 1;
+      gotoEntry#set_text "GOTO #";
+      gotoEntry#select_region ~start:0 ~stop:gotoEntry#text_length
+    with
+	_ -> ()
   in let step_gui ?(break=false) i () =
     rnaStep ~break gui i;
     instrList#moveto (max (gui.currentPos - 8) 0) 1
@@ -483,6 +488,8 @@ let setupGui (rna_instrs : rna_instr list) =
       GButton.toggle_button ~label:"Rating" ~packing:hbImgSelButs#pack ();
     ignore (gui.rating_mask_toggler#connect#toggled ~callback:rmt_cb);
     Array.iteri mi_convert meta_instrs;
+    gotoEntry#set_text "GOTO #";
+    gotoEntry#select_region ~start:0 ~stop:gotoEntry#text_length;
     ignore (reset#connect#clicked ~callback:reset_gui);
     ignore (redraw#connect#clicked ~callback:(update_gui gui));
     ignore (plus1#connect#clicked ~callback:(step_gui 1));
@@ -497,6 +504,7 @@ let setupGui (rna_instrs : rna_instr list) =
     ignore (minus10000#connect#clicked ~callback:(rstep_gui 10000));
     ignore (areaEventBox#event#connect#motion_notify
 	       ~callback:(mouseMoveCB gui));
+    ignore (gotoEntry#connect#activate ~callback:gotoEntryCB);
     ignore (breakEntry#connect#activate
 	       ~callback:(fun () -> gui.commentBreakRegexp <-
 		 match breakEntry#text with
