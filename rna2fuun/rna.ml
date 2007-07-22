@@ -44,7 +44,7 @@ type rna_instr =
     | RI_AddBitmap
     | RI_Compose
     | RI_Clip
-    | RI_Ignore
+    | RI_Ignore of string
 
 let black : rgb = (0, 0, 0)
 let red : rgb = (255, 0, 0)
@@ -82,7 +82,11 @@ let string_of_instr = function
   | RI_AddBitmap -> "AddBmap"
   | RI_Compose -> "Compose"
   | RI_Clip -> "Clip"
-  | RI_Ignore -> "Ignore"
+  | RI_Ignore x -> "Ignore"
+
+let custromstring_of_instr = function
+  | RI_Ignore str -> str
+  | _ -> ""
 
 let createOpaqueBitmap () =
   let opaquePixel = ((black, opaque) : pixel)
@@ -337,10 +341,8 @@ let apply_instr st instr =
       | RI_AddBitmap -> addBitmap st (createTransparentBitmap ())
       | RI_Compose -> compose st
       | RI_Clip -> clip st
-      | RI_Ignore -> ()
+      | RI_Ignore _ -> ()
   with
       x -> fprintf stderr "execute error during %s: %s\n"
 	(string_of_instr instr) (Printexc.to_string x);
 	flush stderr
-
-

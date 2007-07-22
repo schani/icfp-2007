@@ -286,7 +286,7 @@ let setupGui (rna_instrs : rna_instr list) =
   in let instrListBar = GRange.scrollbar `VERTICAL
     ~packing:(hb1#pack ~from:`END) ()
   in let instrList = GList.clist
-    ~titles:["Number";"Count";"Command";"RNA-Line"]
+    ~titles:["Number";"Count";"Command";"RNA-Line";"Custom Data like Comment"]
     ~shadow_type:`OUT ~vadjustment:instrListBar#adjustment
     ~packing:(hb1#pack ~expand:true) ()
   in let reset = GButton.button ~label:"reset" ~packing:hbCmd#pack ()
@@ -313,7 +313,8 @@ let setupGui (rna_instrs : rna_instr list) =
   in let bitmapsLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let statelistlenlabel = GMisc.label ~text:"RNAs:"
     ~packing:hbStatus#pack ()
-  in let ratingLabel = GMisc.label ~text:"Rating: ? (?%)" ~packing:hbStatus2#pack ()
+  in let ratingLabel = GMisc.label ~text:"Rating: ? (?%)"
+    ~packing:hbStatus2#pack ()
   in let mouseInfoLabel = GMisc.label ~text:"Mouse()"
     ~packing:hbStatus2#pack ()
   in let area = GMisc.drawing_area ~width:600 ~height:600
@@ -339,15 +340,19 @@ let setupGui (rna_instrs : rna_instr list) =
       statelistlenlabel#set_text (sprintf "RNA: %i/%i"
 				     gui.currentPos (Array.length meta_instrs))
   in let mouseMoveCB gui moEv =
-    let currentBitmap = get_current_bitmap gui
-    in let x,y =
-      int_of_float (GdkEvent.Motion.x moEv),
-      int_of_float (GdkEvent.Motion.y moEv)
-    in let (r,g,b),a = currentBitmap.(y).(x)
-    in
-      mouseInfoLabel#set_text
-	(sprintf "Mouse(%03i,%03i: R=%03i,G=%03i,B=%i,a=%03i)" x y r g b a);
-      false
+    try
+      let currentBitmap = get_current_bitmap gui
+      in let x,y =
+	int_of_float (GdkEvent.Motion.x moEv),
+	int_of_float (GdkEvent.Motion.y moEv)
+      in let (r,g,b),a = currentBitmap.(y).(x)
+      in
+	   mouseInfoLabel#set_text
+	     (sprintf "Mouse(%03i,%03i: R=%03i,G=%03i,B=%i,a=%03i)" x y r g b a);
+	false
+    with
+	_ -> false (* i keep gettin exceptions,
+		      but this is not mission critical anyway *)
   in let rna_state_history_size =
     1 + (Array.length meta_instrs) / history_granularity
   in let gui = { mainWindow = w;
@@ -400,7 +405,8 @@ let setupGui (rna_instrs : rna_instr list) =
     ignore (instrList#append [string_of_int i;
 			      string_of_int e.mi_count;
 			      string_of_instr e.mi_instr;
-                              string_of_int e.mi_rnaline])
+                              string_of_int e.mi_rnaline;
+                              custromstring_of_instr e.mi_instr])
   and rmt_cb () =
     update_gui gui ()
   and srcdest_cb who what () =

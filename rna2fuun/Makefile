@@ -8,7 +8,7 @@ SRCFILES = $(shell echo *.ml *.mli *.mll *.mly) Makefile Makefile.ocaml
 DISTFILES = $(DOCFILES) $(OTHERFILES) $(SRCFILES)
 DISTVERSIONFILES =
 MODULES = rna parseintern
-LIBRARIES =
+LIBRARIES = str
 LIBRARIES-grna2fuun = lablgtk2/lablgtk
 DISTVERSION = $(shell cat VERSION)
 

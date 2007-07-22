@@ -27,7 +27,7 @@ let parse_line str =
     | '+' -> RI_AddBitmap
     | '*' -> RI_Compose
     | '&' -> RI_Clip
-    | '?' -> RI_Ignore
+    | '?' -> RI_Ignore (Str.string_after str 1)
     | _ -> assert false
 
 let read_trace filename =
