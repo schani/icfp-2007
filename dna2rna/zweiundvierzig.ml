@@ -1,38 +1,39 @@
 (* 42 *)
 
-let answer = [
-  ( 0x000510, "AAA_geneTablePageNr" );
-  ( 0x2ccd88, "M-class-planet" );
-  ( 0x0c4589, "__array_index" );
-  ( 0x0c45a1, "__array_value" );
-  ( 0x0c45e9, "__bool" );
-  ( 0x0c45ea, "__bool_2" );
-  ( 0x0c45b9, "__funptr" );
-  ( 0x0c461b, "__int1" );
-  ( 0x0c4628, "__int12" );
-  ( 0x0c4634, "__int12_2" );
-  ( 0x0c45eb, "__int24" );
-  ( 0x0c4603, "__int24_2" );
-  ( 0x0c4625, "__int3" );
-  ( 0x0c4640, "__int48" );
-  ( 0x0c461c, "__int9" );
-  ( 0x0c4541, "acc1" );
-  ( 0x0c4559, "acc2" );
-  ( 0x0c4571, "acc3" );
-  ( 0x6fce9c, "activateAdaptionTree" );
-  ( 0x6fd99e, "activateGene" );
-  ( 0x252fa1, "adapter" );
-  ( 0x41b532, "addFunctinosCBF" );
-  ( 0x54b1ba, "addInts" );
-  ( 0x5580c4, "anticompressant" );
-  ( 0x65f785, "apple" );
-  ( 0x3c870e, "appletree" );
-  ( 0x711dc6, "apply1_adaption" );
-  ( 0x719633, "apply2_adaption" );
+let answer : (int * (string * int option * int option * int option)) list = [
+  ( 0x000510, ("AAA_geneTablePageNr", None, None, None ));
+  ( 0x2ccd88, ("M-class-planet", None, None, None ));
+  ( 0x0c4589, ("__array_index", None, None, None ));
+  ( 0x0c45a1, ("__array_value", None, None, None ));
+  ( 0x0c45e9, ("__bool", None, None, None ));
+  ( 0x0c45ea, ("__bool_2", None, None, None ));
+  ( 0x0c45b9, ("__funptr", None, None, None ));
+  ( 0x0c461b, ("__int1", None, None, None ));
+  ( 0x0c4628, ("__int12", None, None, None ));
+  ( 0x0c4634, ("__int12_2", None, None, None ));
+  ( 0x0c45eb, ("__int24", None, None, None ));
+  ( 0x0c4603, ("__int24_2", None, None, None ));
+  ( 0x0c4625, ("__int3", None, None, None ));
+  ( 0x0c4640, ("__int48", None, None, None ));
+  ( 0x0c461c, ("__int9", None, None, None ));
+  ( 0x0c4541, ("acc1", None, None, None ));
+  ( 0x0c4559, ("acc2", None, None, None ));
+  ( 0x0c4571, ("acc3", None, None, None ));
+  ( 0x6fce9c, ("activateAdaptionTree", None, None, None ));
+  ( 0x6fd99e, ("activateGene", None, None, None ));
+  ( 0x252fa1, ("adapter", None, None, None ));
+  ( 0x41b532, ("addFunctinosCBF", None, None, None ));
+  ( 0x54b1ba, ("addInts", None, None, None ));
+  ( 0x5580c4, ("anticompressant", None, None, None ));
+  ( 0x65f785, ("apple", None, None, None ));
+  ( 0x3c870e, ("appletree", None, None, None ));
+  ( 0x711dc6, ("apply1_adaption", None, None, None ));
+  ( 0x719633, ("apply2_adaption", None, None, None ));
+  ( 0x6f1943, ("draw_ellipse", None, Some 97, Some 0));
 ]
 
 let get_answer key =
   if List.mem_assoc key answer then
     List.assoc key answer
   else
-    Printf.sprintf "0x%06x" key
+    ((Printf.sprintf "KANALDECKEL-ICKS%06x" key), None, None, None)
