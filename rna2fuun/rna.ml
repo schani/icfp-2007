@@ -55,6 +55,9 @@ let magenta : rgb = (255, 0, 255)
 let cyan : rgb = (0, 255, 255)
 let white : rgb = (255, 255, 255)
 
+let transparent : transparency = 0
+let opaque : transparency = 255
+
 let string_of_rgb = function
   | (0, 0, 0) -> "black"
   | (255, 0, 0) -> "red"
@@ -64,7 +67,7 @@ let string_of_rgb = function
   | (255, 0, 255) -> "magenta"
   | (0, 255, 255) -> "cyan"
   | (255, 255, 255) -> "white"
-  | r,g,b -> sprintf "RGB:(%i,%i,%i)" r g b
+  | r,g,b -> sprintf "RGB:(%03i,%03i,%03i)" r g b
 
 let string_of_instr = function
   | RI_RGB c -> string_of_rgb c
@@ -80,9 +83,6 @@ let string_of_instr = function
   | RI_Compose -> "Compose"
   | RI_Clip -> "Clip"
   | RI_Ignore -> "Ignore"
-
-let transparent : transparency = 0
-let opaque : transparency = 255
 
 let createOpaqueBitmap () =
   let opaquePixel = ((black, opaque) : pixel)
@@ -131,6 +131,11 @@ let createEmptyFastBucket () =
 let pixel_from_fastbucket fb =
   Lazy.force fb.fb_getPixel
 
+let string_of_fastbucket fb =
+  let (r,g,b),a = pixel_from_fastbucket fb
+  in
+    sprintf "(R=%03i,G=%03i,B=%03i,a=%03i)" r g b a
+
 let really_pixel_from_fastbucket fb =
   let (r,g,b),a = fb.fb_pixel
   in let rc = if fb.fb_rgb_count > 0 then r / fb.fb_rgb_count else 0
@@ -139,7 +144,11 @@ let really_pixel_from_fastbucket fb =
   in let ac = if fb.fb_transparency_count > 0 then
     a / fb.fb_transparency_count else 255
   in
-      (rc * ac / 255, gc * ac / 255, bc * ac / 255), ac
+  let (r,g,b),a = (rc * ac / 255, gc * ac / 255, bc * ac / 255), ac
+  in
+(*    fprintf stderr "just computed really_pixel: R=%i, G=%i, B=%i, a=%i\n"
+      r g b a; flush stderr; *)
+    (r,g,b),a
 
 let colorAdd fb (rd,gd,bd) =
   let (r,g,b),a = fb.fb_pixel

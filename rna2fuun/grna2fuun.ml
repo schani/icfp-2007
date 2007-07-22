@@ -40,6 +40,12 @@ type gui = {
   mutable bmMode : bm_mode;
 }
 
+let get_current_bitmap gui =
+  try 
+    List.nth gui.rna_state.bitmaps gui.currentBitmap
+  with
+      _ -> List.hd gui.rna_state.bitmaps (* a bit hacky.. *)
+
 let usage () =
   fprintf stderr "usage not yet written, sorry";
   exit 1
@@ -182,8 +188,7 @@ let update_gui gui () =
   begin
     match gui.bmMode with
       | GM_BITMAP ->
-	  displayBitmap gui (List.nth gui.rna_state.bitmaps
-				gui.currentBitmap) gui.drawing;
+	  displayBitmap gui (get_current_bitmap gui) gui.drawing;
       | GM_SRC ->
 	  displayImage gui gui.srcImg
       | GM_DST ->
@@ -302,38 +307,47 @@ let setupGui (rna_instrs : rna_instr list) =
   in let markLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let _ = GMisc.label ~text:"DIR:" ~packing:hbStatus#pack ()
   in let dirLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
+  in let _ = GMisc.label ~text:"BUCKET:" ~packing:hbStatus#pack ()
+  in let bucketLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let _ = GMisc.label ~text:"BITMAPS:" ~packing:hbStatus#pack ()
   in let bitmapsLabel = GMisc.label ~text:"?" ~packing:hbStatus#pack ()
   in let statelistlenlabel = GMisc.label ~text:"RNAs:"
     ~packing:hbStatus#pack ()
   in let ratingLabel = GMisc.label ~text:"Rating: ? (?%)" ~packing:hbStatus2#pack ()
-  in let mouseCoordLabel = GMisc.label ~text:"Mouse()"
-    ~packing:hbStatus#pack ()
+  in let mouseInfoLabel = GMisc.label ~text:"Mouse()"
+    ~packing:hbStatus2#pack ()
   in let area = GMisc.drawing_area ~width:600 ~height:600
     ~packing:areaEventBox#add ()
   in let drawing = area#misc#realize (); new GDraw.drawable (area#misc#window)
   in let update_status gui =
     let rnaState = gui.rna_state
+    in let currentBitmap = get_current_bitmap gui
     in let posix, posiy = rnaState.Rna.position
     and markx, marky = rnaState.mark
-    and rating = computeRating (List.hd gui.rna_state.bitmaps) gui.destBitmap
+    and rating = computeRating currentBitmap gui.destBitmap
     in
       instrList#select gui.currentPos 1;
       instrList#moveto (abs (gui.currentPos - 5)) 1;
       posLabel#set_text (sprintf "(%i,%i)" posix posiy);
       markLabel#set_text (sprintf "(%i,%i)" markx marky);
       dirLabel#set_text (string_of_dir rnaState.dir);
+      bucketLabel#set_text (string_of_fastbucket rnaState.fastbucket);
       bitmapsLabel#set_text (string_of_int (List.length rnaState.bitmaps));
       ratingLabel#set_text (sprintf "Rating: %i (%f%%)" rating
 			       ((float_of_int (600*600 - rating))
 				 /. (600.0 *. 6.0)));
       statelistlenlabel#set_text (sprintf "RNA: %i/%i"
 				     gui.currentPos (Array.length meta_instrs))
-  in let mouseMoveCB moEv =
-    mouseCoordLabel#set_text (sprintf "Mouse(%i,%i)"
-				 (int_of_float (GdkEvent.Motion.x moEv))
-				 (int_of_float (GdkEvent.Motion.x moEv)));
-       false
+  in let mouseMoveCB gui moEv =
+    let currentBitmap = get_current_bitmap gui
+    in let x,y =
+      int_of_float (GdkEvent.Motion.x moEv),
+      int_of_float (GdkEvent.Motion.y moEv)
+    in let (r,g,b),a = currentBitmap.(y).(x)
+    in
+      mouseInfoLabel#set_text
+	(sprintf "Mouse(%03i,%03i: R=%03i,G=%03i,B=%i,a=%03i)" x y r g b a);
+      false
   in let rna_state_history_size =
     1 + (Array.length meta_instrs) / history_granularity
   in let gui = { mainWindow = w;
@@ -443,7 +457,8 @@ let setupGui (rna_instrs : rna_instr list) =
     ignore (plus100#connect#clicked ~callback:(rnaStep gui 100));
     ignore (plus1000#connect#clicked ~callback:(rnaStep gui 1000));
     ignore (plus10000#connect#clicked ~callback:(rnaStep gui 10000));
-    ignore (areaEventBox#event#connect#motion_notify ~callback:mouseMoveCB);
+    ignore (areaEventBox#event#connect#motion_notify
+	       ~callback:(mouseMoveCB gui));
     areaEventBox#event#add [`POINTER_MOTION];
     ignore (runto#connect#clicked ~callback:(rnaStep ~break:true gui max_int));
     ignore (area#event#connect#expose ~callback:(redraw_gui gui));

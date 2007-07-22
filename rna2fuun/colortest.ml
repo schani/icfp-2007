@@ -107,4 +107,8 @@ let _ =
   for i = 1 to 10 do b:= colorAdd !b white done;
   for i = 1 to 03 do b:= alphaAdd !b opaque done;
   for i = 1 to 01 do b:= alphaAdd !b transparent done;
+  dumpPixel (pixel_from_fastbucket !b);
+  b := createEmptyFastBucket ();
+  for i = 1 to 9 do b:= colorAdd !b white done;
+  dumpPixel (pixel_from_fastbucket !b);
   dumpPixel (pixel_from_fastbucket !b)
