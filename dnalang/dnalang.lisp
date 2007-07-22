@@ -1,6 +1,11 @@
 (load "utils.lisp")
 (load "let-match.lisp")
 
+(defpackage "DNALANG"
+  (:use "CL" "EXT" "UTILS" "LET-MATCH"))
+
+(in-package :dnalang)
+
 (defun asnat (n &optional (terminator t))
   (cond ((zerop n)
 	 (if terminator "P" ""))
@@ -95,6 +100,16 @@
 (defun guide-page (page-num)
   (replace-constant "IFPCFFP" page-num))
 
+(defun gene-table-page-num (page-num)
+  (replace-constant "IPIFPFIP" page-num))
+
+(defun make-page-prefixes (nameprefix num genfunc)
+  (dolist (i (integers-upto num))
+    (let* ((i (1+ i))
+	   (filename (format nil "~A~A.prefix" nameprefix i)))
+      (with-open-file (out filename :direction :output :if-exists :supersede)
+	(format out (funcall genfunc i))))))
+
 (defvar *greenzonestart* "IFPICFPPCFFPP")
 
 (defun modify-green-zone (offset newval)
@@ -102,3 +117,6 @@
 		`((0 _ 0) ,newval)
    ))
 
+(defun prepend-green-fragment (offset len)
+  (compile-rule `((group (? ,*greenzonestart*) ,(- offset (length *greenzonestart*)) (group ,len)))
+		'((0 _ 0) (1 _ 0))))
