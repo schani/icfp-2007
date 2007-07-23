@@ -20,21 +20,19 @@
 	(t
 	 (string-concat "C" (asnat (ash n -1) terminator)))))
 
-(defun multiply-string (n str)
-  (cond ((zerop n) "")
-	(t 
-	 (string-concat str (multiply-string (1- n) str)))))
-
 
 (defun asnat-fixedwidth (n len)
-  (let* ((an (asnat n nil))
-	 (l  (length an)))
-    (assert (<= l len))
-    (string-concat an (multiply-string (- len l 1) "I") "P")))
-	
+  (if (< n 0)
+      (let ((zk (+ (logxor (1- (ash 1 (1- len))) (- n) 1))))
+	(asnat-fixedwidth zk len))
+    (let* ((an (asnat n nil))
+	   (l  (length an)))
+      (assert (<= l len))
+      (string-concat an (make-string (- len l 1) :initial-element #\I) "P"))))
+  
   
 (defun quote-dna (str)
-  (apply #'string-concat
+  (reduce #'string-concat
 	 (map 'list #'(lambda (c)
 			(case c
 			  (#\I "C")
@@ -153,4 +151,26 @@
 			     (asnat-fixedwidth arg 24))
 			    (t
 			     (error "cannot encode arg ~A" arg))))))
+			     
+;;(defun compile-polygon-coordinates (list) 
+;;  (labels ((asnat-pair (x)
+;;	     (string-concat (asnat-fixedwidth (car x) 12)
+;;			    (asnat-fixedwidth (cdr x) 12)))
+;;	   (add-pair (x y) (+ (car x) (car y)) (cdr x)))
+;;    
+;;    (let* ((len (length list))
+;;	   (str (reduce #'string-concat 
+;;			(mapcar #'asnat-pair list)
+;;			:initial-value (asnat-fixedwidth len 12))))
+;;      str)))
+	 
+(defvar *greenzonelength* 7509409)
 
+(defvar *universal-return*
+  (compile-rule `((? ,*greenzonestart*) 
+		  (group ,*greenzonelength*)
+		  (group 24)
+		  (group 24) "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII")
+		`("IIPIP" (1 _ 0) "IIPIP" (2 _ 0) "IICIICIICIPPPIPPCPIIC" 
+		  ,*greenzonestart*
+		  (0 _ 0))))
