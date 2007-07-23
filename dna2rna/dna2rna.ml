@@ -6,6 +6,9 @@ let arg_output_filename = ref "/void/endo/endo.rna"
 let arg_history_filename : string option ref = ref None
 let arg_metahistory_path : string option ref = ref None
 
+let green_zone_start = 13615;;
+let green_zone_length = 7509409;;
+
 exception Hell;;
 
 (****************************************************************************)
@@ -299,6 +302,39 @@ let print_env env =
   in
     print env 0;;
 
+
+let maybecall pat tpl = 
+  match pat with
+    | [P_Skip skip1; P_ParenL; P_Skip skip2; P_ParenL; P_Skip skip3; P_ParenR; P_Skip skip4; P_ParenR] ->
+	(let skip1 = int_of_big_int skip1
+	and skip2 = int_of_big_int skip2
+	and skip3 = int_of_big_int skip3
+	and skip4 = int_of_big_int skip4
+	  in match tpl with
+	      (T_Sub (subn1, subl1)) :: (T_Sub (subn2, subl2)) :: rest ->
+		(let subn1 = int_of_big_int subn1
+		and subl1 = int_of_big_int subl1
+		and subn2 = int_of_big_int subn2
+		and subl2 = int_of_big_int subl2
+		  in match (subn1, subl1, subn2, subl2) with
+		      (0, 0, 1, 0) ->
+			if (skip2 + skip3 + skip4 = green_zone_length)
+			then
+			  (
+			    print_string "possibly a function at: ";
+			    print_int skip2;
+			    print_string " ";
+			    print_int skip3;
+			    print_string " --- ";
+			    print_int (skip2+ green_zone_start); 
+			    print_newline();
+			    false)
+			else
+			  false
+		    | _ -> false)
+	    | _ -> false)
+    | _ -> false
+
 (* val matchreplace : pattern -> template -> dna -> (dna * (match_info option)) *)
 let matchreplace pat tpl dna_orig =
   match build_env pat dna_orig with
@@ -344,6 +380,7 @@ let rec execute dna rna i =
 	    (let filename = sprintf "/void/endo/endo.%d.rna2" (!i / 100000)
 	     in let file = open_out filename
 	     in Rna.write_rna rna file; close_out file);
+	  ignore(maybecall pat tpl);
 	  let (dna, info) = matchreplace pat tpl dna
 	  in fprintf history_file "%d %d %d %d " pattern_len template_len pattern_rnas template_rnas;
 	    (match info with
