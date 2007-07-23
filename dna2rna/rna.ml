@@ -84,7 +84,7 @@ let concat_rna rna dna =
   in (match !arg_breakpoint with
 	  Some breakpoint_rna -> if breakpoint_rna = new_rna then do_break := true
 	| _ -> ());
-    print_string "RNA out: "; print_string (rna2string new_rna); print_newline ();
+    (* print_string "RNA out: "; print_string (rna2string new_rna); print_newline (); *)
     new_rna::rna;;
   
 let write_rna rev_rna oc = 

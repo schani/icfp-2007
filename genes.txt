@@ -16,6 +16,10 @@
 6f1943 (len dec 6235)	draw ellipse. args: off_x off_y width height fill(bool)
 c7da8			draw ellipse degree skip
 
+5a5f7e 1b95		draw poly
+5412ab a4b		move * arg1, cw, move * arg2, ccw
+571a21 af7		??
+52df43 834		?
 
 apple offsets found as numbers: 3990831
 apple tree: (+ #x3c870e #x372b) 3980857

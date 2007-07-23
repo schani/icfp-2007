@@ -20,17 +20,20 @@ let answer : (int * (string * int option * int option * int option)) list = [
   ( 0x0c4559, ("acc2", None, None, None ));
   ( 0x0c4571, ("acc3", None, None, None ));
   ( 0x0c7da8, ("angleSkip", None, None, None ));
+  ( 0x5a5f7e, ("drawPoly", None, Some 24529, Some 0));
   ( 0x6fce9c, ("activateAdaptionTree", None, None, None ));
   ( 0x6fd99e, ("activateGene", None, None, None ));
   ( 0x252fa1, ("adapter", None, None, None ));
   ( 0x41b532, ("addFunctinosCBF", None, None, None ));
+  ( 0x5412ab, ("move", None, Some 48, Some 0));
   ( 0x54b1ba, ("addInts", None, None, None ));
   ( 0x5580c4, ("anticompressant", None, None, None ));
-  ( 0x65f785, ("apple", None, None, None ));
+  ( 0x571a21, ("??571a21", None, Some 48, None ));
+  ( 0x65f785, ("apple", None, Some 0, Some 0 ));
   ( 0x3c870e, ("appletree", None, None, None ));
   ( 0x711dc6, ("apply1_adaption", None, None, None ));
   ( 0x719633, ("apply2_adaption", None, None, None ));
-  ( 0x6f1943, ("draw_ellipse", None, Some 97, Some 0));
+  ( 0x6f1943, ("drawEllipse", None, Some 97, Some 0));
 ]
 
 let get_answer key =

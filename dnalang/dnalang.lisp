@@ -144,7 +144,6 @@
   (compile-rule '((group (? "IFPICFPPCCC") (group (? "IFPICFPPCCC"))))
 		`((0 _ 0) ,(asnat offset) ,(asnat len) (1 _ 0))))
 
-
 (defun compile-pass-arg (arg) 
   (compile-rule '((group (? "IFPICFPPCFIPP")))
 		`((0 _ 0) ,(cond
@@ -152,6 +151,6 @@
 			     arg)
 			    ((integerp arg)
 			     (asnat-fixedwidth arg 24))
-			    ((t)
-			     (assert NIL))))))
-			     
+			    (t
+			     (error "cannot encode arg ~A" arg))))))
+

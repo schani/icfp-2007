@@ -29,7 +29,7 @@ let _ =
     let dna = read_dna stdin
     in match (!arg_disasm_start, !arg_disasm_len) with
 	(Some start, Some len) ->
-	  disassemble (green_fragment dna start len)
+	  disassemble (green_fragment dna start len) start len
       | _ ->
 	  execute dna Rna.empty_rna 1;;
 
