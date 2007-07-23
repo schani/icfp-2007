@@ -1,6 +1,7 @@
 open Dnabuf
 open Dna2rna
 open Zweiundvierzig
+open Big_int
 
 exception Unknown_insn;;
 
