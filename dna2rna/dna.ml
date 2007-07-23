@@ -4,8 +4,8 @@ open Printf;;
 open Big_int;;
 open Disasm;;
 
-let arg_disasm_start = None;;
-let arg_disasm_len = None;;
+let arg_disasm_start = ref None;;
+let arg_disasm_len = ref None;;
 
 let _ =
   let speclist = [
@@ -27,9 +27,9 @@ let _ =
       (fun s -> Arg.usage speclist (Printf.sprintf "illegal argument: %s" s))
       usage_message;
     let dna = read_dna stdin
-    in match (arg_disasm_start, arg_disasm_len) with
+    in match (!arg_disasm_start, !arg_disasm_len) with
 	(Some start, Some len) ->
-	  disassemble (subbuf dna start (start + len))
+	  disassemble (green_fragment dna start len)
       | _ ->
 	  execute dna Rna.empty_rna 1;;
 

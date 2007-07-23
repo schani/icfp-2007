@@ -19,6 +19,7 @@ let answer : (int * (string * int option * int option * int option)) list = [
   ( 0x0c4541, ("acc1", None, None, None ));
   ( 0x0c4559, ("acc2", None, None, None ));
   ( 0x0c4571, ("acc3", None, None, None ));
+  ( 0x0c7da8, ("angleSkip", None, None, None ));
   ( 0x6fce9c, ("activateAdaptionTree", None, None, None ));
   ( 0x6fd99e, ("activateGene", None, None, None ));
   ( 0x252fa1, ("adapter", None, None, None ));
@@ -36,5 +37,5 @@ let get_answer key =
   if List.mem_assoc key answer then
     List.assoc key answer
   else
-    ((Printf.sprintf "KANALDECKEL-ICKS%06x" key), None, None, None)
+    ((Printf.sprintf "#x%x" key), None, None, None)
   
