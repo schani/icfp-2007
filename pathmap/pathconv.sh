@@ -6,6 +6,10 @@ cat $1 | \
     tr ':' ' ' | sed 's/[.][0-9]*//g' | \
     gawk '
 	
+	function putnum(a,b) {
+	    printf("%c %d\n",a,b);
+	}
+	
 	(NF<3)	{ next }
 	
 	/^M/	{ C=0; M++; N=0;
@@ -25,14 +29,24 @@ cat $1 | \
 		
 	END	{
 		  for (m=1; m<=M; m++) {
-		    printf("(");
+		    putnum("#", V[m]);
+		    # printf("(");
 		    for (n=1; n<=V[m]; n++) {
-		      if (n==1) printf("(%d . %d)", X[m,n], Y[m,n]);
-		      else printf("(%d . %d)", X[m,n]-X[m,n-1], Y[m,n]-Y[m,n-1]);
+		      if (n==1) { 
+		      	putnum("X",X[m,n]); 
+			putnum("Y",Y[m,n]); 
+		      } else { 
+		        putnum("x",X[m,n]-X[m,n-1]); 
+			putnum("y",Y[m,n]-Y[m,n-1]); 
+		      }
+		      # if (n==1) printf("(%d . %d)", X[m,n], Y[m,n]);
+		      # else printf("(%d . %d)", X[m,n]-X[m,n-1], Y[m,n]-Y[m,n-1]);
 		      # printf(" %d: (%d,%d) ", n, X[m,n], Y[m,n]);
 		      # printf(" [%d,%d]\n", X[m,n]-X[m,n-1], Y[m,n]-Y[m,n-1]);
 		    }
-		    printf("(%d . %d))\n", X[m,n-1]-X[m,0], Y[m,n-1]-Y[m,0]);
+		    putnum("v",X[m,n-1]-X[m,0]); 
+		    putnum("w",Y[m,n-1]-Y[m,0]); 
+		    # printf("(%d . %d))\n", X[m,n-1]-X[m,0], Y[m,n-1]-Y[m,0]);
 		  }
 		}
     '
