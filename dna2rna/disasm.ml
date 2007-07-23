@@ -16,7 +16,7 @@ let rec data_template tpl =
 let rec bases2str tpl acc = 
   match tpl with
     | [] -> acc
-    | T_Base x :: tpl -> bases2str tpl (acc^x)
+    | T_Base x :: tpl -> bases2str tpl (acc^(String.make 1 (base_to_char x)))
     | _ -> assert false
 
 let print_offset_data mnem offset tpl = 
