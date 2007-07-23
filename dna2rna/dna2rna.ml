@@ -98,7 +98,7 @@ let get_consts dna_orig =
 (****************************************************************************)
 
 (* val get_pattern: dna -> rna -> int -> pattern -> (dna * dna * pattern * int) *)
-let get_pattern dna rna lvl p_rev =
+let get_pattern dna rna =
   let rec work dna rna lvl p_rev rna_length =
     match consume dna with
       | None -> finish rna
@@ -134,12 +134,12 @@ let get_pattern dna rna lvl p_rev =
 		 )
 	  )
   in
-    work dna rna lvl p_rev 0;;
+    work dna rna 0 [] 0;;
 
 (****************************************************************************)
 
 (* val get_template: dna -> rna -> template -> (dna * dna * template * int) *)
-let get_template dna rna t_rev =
+let get_template dna rna =
   let rec work dna rna t_rev rna_length =
     match consume dna with
       | Some(C,dna) -> 
@@ -179,7 +179,7 @@ let get_template dna rna t_rev =
       | None ->
 	  finish rna
   in
-    work dna rna t_rev 0;;
+    work dna rna [] 0;;
 
 (****************************************************************************)
 
@@ -326,15 +326,20 @@ let rec execute dna rna i =
   and history_file = open_out "/void/endo/history"
   in while true do
       (* print_string "dna: "; write_dna !the_dna stdout; print_newline (); *)
-      let (dna, rna, pat, pattern_rnas) = get_pattern !the_dna !the_rna 0 []
+      let (dna, rna, pat, pattern_rnas) = get_pattern !the_dna !the_rna
       in let pattern_len = (length !the_dna) - (length dna)
       in print_string "pattern: "; print_pattern pat; print_newline ();
 	(* print_string "rna: "; write_dna rna stdout; print_newline (); *)
-	let (dna, rna, tpl, template_rnas) = get_template dna rna []
+	let (dna, rna, tpl, template_rnas) = get_template dna rna
 	in let template_len = (length !the_dna) - (length dna) - pattern_len
 	in print_string "template: "; print_template tpl; print_newline ();
 	  (* print_string "concat same: "; print_int !num_concat_same; print_newline (); *)
 	  (* print_string "rna: "; write_dna rna stdout; print_newline (); *)
+	  if !Rna.do_break then
+	    (let file = open_out "/void/endo/breakpoint.dna"
+	     in write_dna dna file;
+	       close_out file;
+	       Rna.do_break := false);
 	  if (!i mod 100000) = 99999 then
 	    (let filename = sprintf "/void/endo/endo.%d.rna2" (!i / 100000)
 	     in let file = open_out filename
@@ -349,9 +354,6 @@ let rec execute dna rna i =
 	    let dna = if (!i mod 2000) = 1999 then (flatten dna) else dna
 	      (* in let rna = if (!i mod 2000) = 1999 then (flatten rna) else rna *)
 	    in (* visualize dna; print_newline (); *)
-	      if !i = 1 then
-		(let oc = open_out "/tmp/after1.dna" in 
-		   write_dna dna oc; close_out oc);
 	      the_dna := dna;
 	      the_rna := rna;
 	      i := !i + 1

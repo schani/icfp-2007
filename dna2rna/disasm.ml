@@ -1,5 +1,6 @@
 open Dnabuf
-open Zweiungvierzig
+open Dna2rna
+open Zweiundvierzig
 
 exception Unknown_insn;;
 
@@ -43,12 +44,13 @@ let print_reserve_stack_space len =
 ;;
 
 let print_function_call offset len =
-  print_string "call -> ";
-  print_int offset;
-  print_string " (<";
-  print_int len;
-  print_string ")";
-  print_newline ()
+  let (name, _, _, _) = get_answer offset
+  in print_string "call -> ";
+    print_string name;
+    print_string " (<";
+    print_int len;
+    print_string ")";
+    print_newline ()
 ;;
 
 let print_function_return skip =
@@ -104,7 +106,7 @@ let print_insn pat tpl rest_length stack_space =
 			else
 			  raise Unknown_insn
 		    | _ -> raise Unknown_insn)
-	     | ->
+	     | _ ->
 		 raise Unknown_insn)
       | [P_Skip skip1; P_ParenL; P_Skip skip2; P_ParenL; P_Skip skip3; P_ParenR; P_Skip skip4; P_ParenR] ->
 	  (let skip1 = int_of_big_int skip1
@@ -134,7 +136,7 @@ let print_insn pat tpl rest_length stack_space =
 	   and skip3 = int_of_big_int skip3
 	   and skip4 = int_of_big_int skip4
 	   in match tpl with
-	       [T_Base I; T_Base I; T_Base P; T_Base I; T_Base P; P_Sub (subn1, subl1); T_Base I; T_Base I; T_Base P; T_Base I; T_Base P; P_Sub (subn2, subl2)  T_Base I; T_Base I; T_Base C; T_Base I; T_Base I; T_Base C; T_Base I; T_Base I; T_Base C; T_Base I; T_Base P; T_Base P; T_Base P; T_Base I; T_Base P; T_Base P; T_Base C; T_Base P; T_Base I; T_Base I; T_Base C; P_Sub (subn3, subl3)] ->
+               [T_Base I; T_Base I; T_Base P; T_Base I; T_Base P; P_Sub (subn1, subl1); T_Base I; T_Base I; T_Base P; T_Base I; T_Base P; P_Sub (subn2, subl2); T_Base I; T_Base I; T_Base C; T_Base I; T_Base I; T_Base C; T_Base I; T_Base I; T_Base C; T_Base I; T_Base P; T_Base P; T_Base P; T_Base I; T_Base P; T_Base P; T_Base C; T_Base P; T_Base I; T_Base I; T_Base C; P_Sub (subn3, subl3)] ->
 		 (let subn1 = int_of_big_int subn1
 		  and subl1 = int_of_big_int subl1
 		  and subn2 = int_of_big_int subn2
@@ -148,7 +150,7 @@ let print_insn pat tpl rest_length stack_space =
 			   None)
 			else
 			  raise Unknown_insn
-		    | -> raise Unknown_insn)
+		    | _ -> raise Unknown_insn)
 	     | _ ->
 		 raise Unknown_insn)
       | _ ->

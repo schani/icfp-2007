@@ -1,4 +1,3 @@
-      
 open Dnabuf
 
 type rnabase = 
@@ -24,6 +23,9 @@ type rnabase =
     | Clip
     | Dead of string
 type rna = rnabase list
+
+let arg_breakpoint : rnabase option ref = ref None
+let do_break = ref false
 
 let empty_rna = []
 
@@ -77,8 +79,13 @@ let rna2string = function
     | Dead(dead) -> "?"^dead
 
 (* val concat_rna: rna -> dna *)
-let concat_rna rna dna = 
-  (dna2rna dna)::rna
+let concat_rna rna dna =
+  let new_rna = dna2rna dna
+  in (match !arg_breakpoint with
+	  Some breakpoint_rna -> if breakpoint_rna = new_rna then do_break := true
+	| _ -> ());
+    print_string "RNA out: "; print_string (rna2string new_rna); print_newline ();
+    new_rna::rna;;
   
 let write_rna rev_rna oc = 
   List.iter
@@ -86,4 +93,3 @@ let write_rna rev_rna oc =
       output_string oc (rna2string rna); 
       output_string oc "\n") 
     (List.rev rev_rna)
-    

@@ -2,14 +2,21 @@ open Dnabuf;;
 open Dna2rna;;
 open Printf;;
 open Big_int;;
+open Disasm;;
+
+let arg_disasm_start = None;;
+let arg_disasm_len = None;;
 
 let _ =
   let speclist = [
     ("-o", Arg.Set_string arg_output_filename, "rna output filename");
     ("-H", Arg.String (fun s -> arg_history_filename := Some s),
-    "history output filename");
+     "history output filename");
     ("-M", Arg.String (fun s -> arg_metahistory_path := Some s),
      "metahistory output directory");
+    ("-b", Arg.String (fun s -> Rna.arg_breakpoint := Some (Rna.dna2rna (create s false))), "breakpoint RNA");
+    ("-d", Arg.Int (fun i -> arg_disasm_start := Some i), "disasm start");
+    ("-l", Arg.Int (fun i -> arg_disasm_len := Some i), "disasm length")
   ]
   and usage_message =
     Sys.argv.(0) ^ "usage: " ^ Sys.argv.(0) ^
@@ -20,8 +27,11 @@ let _ =
       (fun s -> Arg.usage speclist (Printf.sprintf "illegal argument: %s" s))
       usage_message;
     let dna = read_dna stdin
-    in
-      execute dna Rna.empty_rna 1;;
+    in match (arg_disasm_start, arg_disasm_len) with
+	(Some start, Some len) ->
+	  disassemble (subbuf dna start (start + len))
+      | _ ->
+	  execute dna Rna.empty_rna 1;;
 
 (*
 let rec find_intervals dna i =
